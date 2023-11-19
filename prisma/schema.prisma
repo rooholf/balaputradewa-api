@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  password String
+  nama     String
+  role     String
+}
+
+model Vehicles {
+  id     Int     @id @default(autoincrement())
+  plat   String  @unique
+  warna  String?
+  merk   String
+  rangka String?
+  kodeSupplier String
+
+  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Suppliers {
+  id   Int    @id @default(autoincrement())
+  kode String @unique
+  nama String
+  kendaraan Vehicles[]
+  harga_suppliers Supplier_price[] 
+  supplier_orders Supplier_orders[]
+  pabrik Factories[]
+}
+
+model Supplier_orders {
+  id             Int      @id @default(autoincrement())
+  kode_transaksi String   @unique
+  tanggal        DateTime @db.Date
+  kodeSupplier   String
+  kodeTransaksi  String
+  
+  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Supplier_price {
+  id    Int     @id @default(autoincrement())
+  harga Int
+  isPPN Boolean
+  kodeSupplier String
+
+  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Factories {
+  id   Int    @id @default(autoincrement())
+  kode String @unique
+  nama String
+
+  harga_pabrik Factory_prices[]
+  Suppliers Suppliers[]
+  pabrik_orders Factory_orders[]
+}
+
+model Factory_prices {
+  id    Int @id @default(autoincrement())
+  harga Int
+  kodePabrik String
+  pabrik Factories @relation(fields: [kodePabrik], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Factory_orders {
+  id             Int      @id @default(autoincrement())
+  kode_transaksi String   @unique
+  tanggal        DateTime @db.Date
+  kodePabrik     String
+  kodeTransaksi  String
+
+  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  pabrik Factories @relation(fields: [kodePabrik], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Farmers {
+  id   Int    @id @default(autoincrement())
+  nama String
+  kode String @unique
+  petani_orders petani_orders[]
+
+}
+
+model petani_orders {
+  id             Int      @id @default(autoincrement())
+  kode_transaksi String   @unique
+  tanggal        DateTime @db.Date
+  idPetani     Int
+  kodeTransaksi  String
+
+  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade )
+  farmer Farmers @relation(fields: [idPetani], references: [id], onDelete: Cascade, onUpdate: Cascade )
+}
+
+model Bank_account {
+  id        Int    @id @default(autoincrement())
+  kode_bank String
+  nama      String
+}
+
+model Transaction {
+  id            Int       @id @default(autoincrement())
+  kode          String    @unique
+  jenis         String
+  deskripsi     String
+  tanggal_bayar DateTime?
+  tanggal_kirim DateTime?
+  tanggal       DateTime  @db.Date
+
+  supplier_orders Supplier_orders[]
+  pabrik_orders Factory_orders[]
+  petani_orders petani_orders[]
+}
