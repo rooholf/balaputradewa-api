@@ -1,0 +1,57 @@
+# docker-compose.yml
+version: '3.9'
+
+services:
+  app:
+    # use the bun image from docker hub
+    image: "oven/bun:latest"
+    # override default entrypoint allows us to do `bun install` before serving
+    entrypoint: []
+    # execute bun install before we start the dev server in watch mode
+    command: "/bin/sh -c 'bun install && bun run --watch src/index.ts'"
+    # expose the right ports
+    ports: [ "3000:3000" ]
+    # setup a host mounted volume to sync changes to the container
+    volumes: [ "./:/home/bun/app" ]
+    environment:
+      POSTGRES_ADDR: postgres
+      POSTGRES_DATABASE: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    links:
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3.7.4
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15
+    restart: always
+    ports:
+      - 5436:5432
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "postgres", "-d", "db" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    links:
+      - rabbitmq
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata: {}

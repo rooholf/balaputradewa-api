@@ -7,6 +7,7 @@ import { cors } from '@elysiajs/cors'
 import { authRoutes, factoriesRoutes, farmersRoutes, suppliersRoutes, usersRoutes, vehiclesRoutes } from './routes'
 import { isAuthenticated } from './auth'
 
+
 const app = new Elysia({
   name: '@app/ctx',
 })
@@ -84,8 +85,10 @@ const app = new Elysia({
 
   )
   .use(cors())
-  .listen(3000)
+  .listen({
+    hostname: '0.0.0.0',
+    port: 3000,
+  })
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-)
+// `server` will be null if listen isn't called
+console.log(`Running at http://${app.server!.hostname}:${app.server!.port}`)
