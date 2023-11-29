@@ -24,10 +24,7 @@ services:
         condition: service_healthy
     restart: always
     links:
-      - rabbitmq
-
-  rabbitmq:
-    image: rabbitmq:3.7.4
+      - postgres
     networks:
       - app-network
 
@@ -47,8 +44,8 @@ services:
       interval: 5s
       timeout: 10s
       retries: 5
-    links:
-      - rabbitmq
+    networks:
+      - app-network
 networks:
   app-network:
     driver: bridge
