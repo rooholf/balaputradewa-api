@@ -1,62 +1,105 @@
 import { t } from 'elysia';
 
-export const ModelObt = {
-    'user.create': t.Object({
+export const userODT = {
+    'sign': t.Object({
+      email: t.String(),
+      password: t.String()
+    }),
+    'create': t.Object({
       email: t.String(),
       password: t.String({
         minLength: 8
       }),
-      nama: t.String(),
+      name: t.String(),
       role: t.String({
         enum: ['admin', 'user']
       })
     }),
-    'user.response': t.Object({ 
+    'response': t.Object({ 
       id: t.Number(),
       email: t.String(),
-      nama: t.String(),
+      name: t.String(),
+      role: t.String({
+        enum: ['admin', 'user']
+      }),
     }),
-    'supplier.create': t.Object({
-      kode: t.String(),
-      nama: t.String()
+    'update': t.Object({
+      email: t.Optional(t.String()),
+      password: t.Optional(t.String({
+        minLength: 8
+      })),
+      name: t.Optional(t.String()),
+      role: t.Optional(t.String({
+        enum: ['admin', 'user']
+      }))
     }),
-    'supplier.response': t.Object({
-      id: t.Number(),
-      kode: t.String(),
-      nama: t.String()
-    }),
-    'factory.create': t.Object({
-      kode: t.String(),
-      nama: t.String()
-    }),
-    'factory.response': t.Object({
-      id: t.Number(),
-      kode: t.String(),
-      nama: t.String()
-    }),
-    'farmer.create': t.Object({
-      kode: t.String(),
-      nama: t.String()
-    }),
-    'farmer.response': t.Object({
-      id: t.Number(),
-      kode: t.String(),
-      nama: t.String()
-    }),
-    'vehicle.create': t.Object({
-      plat: t.String(),
-      warna: t.Union([t.String(), t.Null()]),
-      merk: t.String(),
-      rangka: t.Union([t.String(), t.Null()]),
-      kodeSupplier: t.String(),
-    }),
-    'vehicle.response': t.Object({
-      id: t.Number(),
-      plat: t.String(),
-      warna: t.Union([t.String(), t.Null()]),
-      merk: t.String(),
-      rangka: t.Union([t.String(), t.Null()]),
-      kodeSupplier: t.String(),
-    }),
-  };
+};
 
+
+export const vehicleODT = {
+  create: t.Object({
+    plate: t.String(),
+    color: t.Union([t.String(), t.Null()]),
+    brand: t.String(),
+    chassis: t.Union([t.String(), t.Null()]),
+    supplierId: t.Number(),
+  }),
+  response: t.Object({
+    id: t.Number(),
+    plate: t.String(),
+    color: t.Union([t.String(), t.Null()]),
+    brand: t.String(),
+    chassis: t.Union([t.String(), t.Null()]),
+    supplierId: t.Number(),
+  })
+};
+
+export const supplierODT = {
+  create: t.Object({
+    code: t.String(),
+    name: t.String()
+  }),
+  response: t.Object({
+    id: t.Number(),
+    code: t.String(),
+    name: t.String()
+  })
+};
+
+export const factoryODT = {
+  create: t.Object({
+    code: t.String(),
+    name: t.String()
+  }),
+  response: t.Object({
+    id: t.Number(),
+    code: t.String(),
+    name: t.String()
+  })
+};
+
+export const farmerODT = {
+  create: t.Object({
+    code: t.String(),
+    name: t.String(),
+    address: t.String(),
+    phone: t.String(),
+  }),
+  response: t.Object({
+    id: t.Number(),
+    code: t.String(),
+    name: t.String(),
+    address: t.String(),
+    phone: t.String(),
+  })
+};
+
+export const transactionODT = {
+  create: t.Object({
+    code: t.String()
+  }),
+  response: t.Object({
+    id: t.Number(),
+    code: t.String()
+  })
+};

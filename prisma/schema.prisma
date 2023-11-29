@@ -1,5 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -11,117 +9,144 @@ datasource db {
 }
 
 model Users {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  password String
-  nama     String
-  role     String
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  password   String
+  name       String
+  role       String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([id, email])
 }
 
 model Vehicles {
-  id     Int     @id @default(autoincrement())
-  plat   String  @unique
-  warna  String?
-  merk   String
-  rangka String?
-  kodeSupplier String
+  id         Int      @id @default(autoincrement())
+  plate      String   @unique
+  color      String?
+  brand      String
+  chassis    String?
+  supplier   Suppliers @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  supplierId Int
+  orders     VehicleOrders[]
 
-  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model VehicleOrders {
+  id             Int      @id @default(autoincrement())
+  transaction_code String   @unique
+  date            DateTime @db.Date
+  plate           String
+  transaction    Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  transactionId  Int
+  vehicle        Vehicles   @relation(fields: [plate], references: [plate], onDelete: Cascade, onUpdate: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Suppliers {
-  id   Int    @id @default(autoincrement())
-  kode String @unique
-  nama String
-  kendaraan Vehicles[]
-  harga_suppliers Supplier_price[] 
-  supplier_orders Supplier_orders[]
-  pabrik Factories[]
+  id             Int                @id @default(autoincrement())
+  code           String             @unique
+  name           String
+  vehicles       Vehicles[]
+  supplierOrders SupplierOrders[]
+  prices         SupplierPrices[]
+  factories      Factories[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-model Supplier_orders {
+model SupplierOrders {
   id             Int      @id @default(autoincrement())
-  kode_transaksi String   @unique
-  tanggal        DateTime @db.Date
-  kodeSupplier   String
-  kodeTransaksi  String
-  
-  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade)
-  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  transaction_code String   @unique
+  date        DateTime @db.Date
+  transaction    Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  transactionId  Int
+  supplier       Suppliers  @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  supplierId     Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-model Supplier_price {
-  id    Int     @id @default(autoincrement())
-  harga Int
-  isPPN Boolean
-  kodeSupplier String
+model SupplierPrices {
+  id           Int      @id @default(autoincrement())
+  price        Int
+  isPPN        Boolean
+  supplier     Suppliers @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  supplierId   Int
 
-  supplier Suppliers @relation(fields: [kodeSupplier], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Factories {
-  id   Int    @id @default(autoincrement())
-  kode String @unique
-  nama String
+  id           Int                @id @default(autoincrement())
+  code         String             @unique
+  name         String
+  prices       FactoryPrices[]
+  suppliers    Suppliers[]
+  orders       FactoryOrders[]
 
-  harga_pabrik Factory_prices[]
-  Suppliers Suppliers[]
-  pabrik_orders Factory_orders[]
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-model Factory_prices {
-  id    Int @id @default(autoincrement())
-  harga Int
-  kodePabrik String
-  pabrik Factories @relation(fields: [kodePabrik], references: [kode], onDelete: Cascade, onUpdate: Cascade)
-}
-
-model Factory_orders {
+model FactoryOrders {
   id             Int      @id @default(autoincrement())
   kode_transaksi String   @unique
   tanggal        DateTime @db.Date
-  kodePabrik     String
-  kodeTransaksi  String
+  transaction    Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  transactionId  Int
+  factory        Factories   @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  factoryId      Int
 
-  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade)
-  pabrik Factories @relation(fields: [kodePabrik], references: [kode], onDelete: Cascade, onUpdate: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model FactoryPrices {
+  id         Int      @id @default(autoincrement())
+  price      Int
+  factory    Factories  @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  factoryId  Int
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model Farmers {
-  id   Int    @id @default(autoincrement())
-  nama String
-  kode String @unique
-  petani_orders petani_orders[]
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  name       String
+  address    String
+  phone      String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
+  farmer_orders FarmerOrder[]
 }
 
-model petani_orders {
-  id             Int      @id @default(autoincrement())
-  kode_transaksi String   @unique
-  tanggal        DateTime @db.Date
-  idPetani     Int
-  kodeTransaksi  String
-
-  transaction Transaction @relation(fields: [kodeTransaksi], references: [kode], onDelete: Cascade, onUpdate: Cascade )
-  farmer Farmers @relation(fields: [idPetani], references: [id], onDelete: Cascade, onUpdate: Cascade )
+model FarmerOrder {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
+  date       DateTime @db.Date
+  farmer     Farmers  @relation(fields: [farmerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  farmerId   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
-model Bank_account {
-  id        Int    @id @default(autoincrement())
-  kode_bank String
-  nama      String
-}
-
-model Transaction {
-  id            Int       @id @default(autoincrement())
-  kode          String    @unique
-  jenis         String
-  deskripsi     String
-  tanggal_bayar DateTime?
-  tanggal_kirim DateTime?
-  tanggal       DateTime  @db.Date
-
-  supplier_orders Supplier_orders[]
-  pabrik_orders Factory_orders[]
-  petani_orders petani_orders[]
+model Transactions {
+  id            Int      @id @default(autoincrement())
+  kode          String   @unique
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  vehicleOrders VehicleOrders[]
+  supplierOrders SupplierOrders[]
+  factoryOrders FactoryOrders[]
 }

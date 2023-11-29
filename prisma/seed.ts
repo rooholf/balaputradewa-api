@@ -1,16 +1,19 @@
+
+
 import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
 try {
     console.log("main")
+    const pw = await Bun.password.hash('password1')
    
     // Create Users
     const user1 = await prisma.users.create({
       data: {
         email: 'user1@example.com',
-        password: 'password1',
-        nama: 'User 1',
+        password: pw,
+        name: 'User 1',
         role: 'user',
       },
     });
@@ -18,8 +21,8 @@ try {
     const user2 = await prisma.users.create({
       data: {
         email: 'user2@example.com',
-        password: 'password2',
-        nama: 'User 2',
+        password: pw,
+        name: 'User 2',
         role: 'user',
       },
     });
@@ -27,60 +30,52 @@ try {
     // Create Suppliers
     const supplier1 = await prisma.suppliers.create({
       data: {
-        kode: 'SUP1',
-        nama: 'Supplier 1',
+        code: 'SUP1',
+        name: 'Supplier 1',
       },
     });
 
     const supplier2 = await prisma.suppliers.create({
       data: {
-        kode: 'SUP2',
-        nama: 'Supplier 2',
+        code: 'SUP2',
+        name: 'Supplier 2',
       },
     });
 
     // Create Vehicles
     const vehicle1 = await prisma.vehicles.create({
       data: {
-        plat: 'B1234CD',
-        warna: 'Merah',
-        merk: 'Toyota',
-        rangka: '1234567890',
-        supplier: {
-          connect: {
-            kode: supplier1.kode,
-          },
-        },
+        plate: 'B1234CD',
+        color: 'Merah',
+        brand: 'Toyota',
+        chassis: '1234567890',
+        supplierId: supplier1.id,
       },
     });
 
     const vehicle2 = await prisma.vehicles.create({
       data: {
-        plat: 'B5678EF',
-        warna: 'Biru',
-        merk: 'Honda',
-        rangka: '0987654321',
-        supplier: {
-          connect: {
-            kode: supplier2.kode,
-          },
-        },
+        plate: 'B5678EF',
+        color: 'Biru',
+        brand: 'Honda',
+        chassis: '0987654321',
+        supplierId: supplier2.id,
       },
     });
 
     // Create Factories
     const factory1 = await prisma.factories.create({
       data: {
-        kode: 'FAC1',
-        nama: 'Factory 1',
-        harga_pabrik: {
+        code: 'FAC1',
+        name: 'Factory 1',
+        prices: {
           create: {
-            harga: 1000000,
+            price: 1000000,
           },
         },
-        Suppliers: {
+        suppliers: {
           connect: {
-            kode: supplier1.kode,
+            code: supplier1.code,
           },
         },
       },
@@ -88,33 +83,38 @@ try {
 
     const factory2 = await prisma.factories.create({
       data: {
-        kode: 'FAC2',
-        nama: 'Factory 2',
-        harga_pabrik: {
+        code: 'FAC2',
+        name: 'Factory 2',
+        prices: {
           create: {
-            harga: 2000000,
+            price: 2000000,
           },
         },
-        Suppliers: {
+        suppliers: {
           connect: {
-            kode: supplier2.kode,
+            code: supplier2.code,
           },
         },
       },
     });
 
+
     // Create Farmers
     const farmer1 = await prisma.farmers.create({
       data: {
-        nama: 'Farmer 1',
-        kode: 'FARM1',
+        name: 'Farmer 1',
+        code: 'FARM1',
+        address: 'Jl. Raya Bogor KM 30',
+        phone: '081234567890',
       },
     });
 
     const farmer2 = await prisma.farmers.create({
       data: {
-        nama: 'Farmer 2',
-        kode: 'FARM2',
+        name: 'Farmer 2',
+        code: 'FARM2',
+        address: 'Jl. Raya Bogor KM 40',
+        phone: '081234567891',
       },
     });
 
