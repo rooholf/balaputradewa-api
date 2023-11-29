@@ -10,7 +10,61 @@ import { isAuthenticated } from './auth'
 const app = new Elysia({
   name: '@app/ctx',
 })
-  .use(swagger())
+  .use(swagger({
+    documentation: {
+      info: {
+        title: 'Elysia API',
+        description: 'Elysia API Documentation',
+        version: '1.0.0',
+      },
+      servers: [
+        {
+          url: 'http://localhost:3000',
+          description: 'Local server',
+        },
+      ],
+      tags: [
+        {
+          name: 'Auth',
+          description: 'Auth API',
+        },
+        {
+          name: 'Factories',
+          description: 'Factories API',
+        },
+        {
+          name: 'Farmers',
+          description: 'Farmers API',
+        },
+        {
+          name: 'Suppliers',
+          description: 'Suppliers API',
+        },
+        {
+          name: 'Users',
+          description: 'Users API',
+        },
+        {
+          name: 'Vehicles',
+          description: 'Vehicles API',
+        },
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+          },
+        },
+      },
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
+    },
+  }))
   .group('/api/v1', (app) =>
     app
       .use(
@@ -29,7 +83,7 @@ const app = new Elysia({
       .use(vehiclesRoutes)
 
   )
- .use(cors())
+  .use(cors())
   .listen(3000)
 
 console.log(

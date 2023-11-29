@@ -4,7 +4,9 @@ import { ctx } from "./context"
 import { jwt } from "@elysiajs/jwt"
 import cookie from "@elysiajs/cookie"
 import { factoryODT, farmerODT, supplierODT, userODT, vehicleODT } from "./model"
+import bearer from "@elysiajs/bearer"
 import cors from "@elysiajs/cors"
+
 
 export const authRoutes = new Elysia()
     .model(userODT)
@@ -19,7 +21,7 @@ export const authRoutes = new Elysia()
                 })
             )
             .use(cookie())
-            .post('/login', async ({ db, body, jwt, setCookie }) => {
+            .post('/login', async ({ db, body, jwt, setCookie, }) => {
                 const user = await db.users.findUnique({
                     where: {
                         email: body.email
@@ -64,6 +66,9 @@ export const authRoutes = new Elysia()
                 }
             }, {
                 body: userODT.sign,
+                detail: {
+                    tags: ['Auth']
+                },
             })
             .post('/register', async ({ db, body }) => {
                 const hashedBody = {
@@ -83,10 +88,13 @@ export const authRoutes = new Elysia()
                     body: userODT.create,
                     response: {
                         200: userODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Auth']
+                    },
                 })
 
-            .post('/refresh', async ({ jwt, cookie }) => {
+            .get('/refresh', async ({ jwt, cookie }) => {
                 const { id } = await jwt.verify(cookie!.refresh_token) as JWTPayloadSpec;
                 if (!id) {
                     throw new Error("Unauthorized");
@@ -103,9 +111,12 @@ export const authRoutes = new Elysia()
                         200: t.Object({
                             access_token: t.String()
                         })
-                    }
+                    },
+                    detail: {
+                        tags: ['Auth']
+                    },
                 })
-            .post('/logout', async ({ setCookie }) => {
+            .get('/logout', async ({ setCookie }) => {
                 setCookie("access_token", "", {
                     maxAge: 0,
                     path: "/",
@@ -125,17 +136,33 @@ export const authRoutes = new Elysia()
                             success: t.Boolean(),
                             message: t.String()
                         })
-                    }
+                    },
+                    detail: {
+                        tags: ['Auth']
+                    },
                 })
     })
 export const usersRoutes = new Elysia()
+    .use(bearer())
     .model(userODT)
     .group('/users', (app) => {
         return app
             .use(ctx)
-            .get('/', async (ctx) => {
-                const users = await ctx.db.users.findMany(
+            .get('/', async ({ db, query, set }) => {
+
+                const { _page, _end, _sort, _order } = query;
+                const limit = +(_end ?? 10);
+                const offset = (+(_page ?? 1) - 1) * limit;
+                const sort = (_sort ?? 'id').toString();
+                const order = _order ?? 'asc';
+
+                const orderBy = { [sort]: order };
+                const userCount = await db.users.count();
+                const users = await db.users.findMany(
                     {
+                        orderBy,
+                        skip: offset,
+                        take: limit,
                         select: {
                             id: true,
                             email: true,
@@ -145,7 +172,13 @@ export const usersRoutes = new Elysia()
                     }
                 )
                 return users
-            })
+            },
+                {
+                    detail: {
+                        tags: ['Users']
+                    },
+                }
+            )
             .get('/:id', async ({ db, params }) => {
                 const user = await db.users.findUnique({
                     where: {
@@ -159,6 +192,10 @@ export const usersRoutes = new Elysia()
                     }
                 })
                 return user
+            }, {
+                detail: {
+                    tags: ['Users']
+                },
             })
             .put('/:id', async ({ db, body, params }) => {
                 const user = await db.users.update({
@@ -179,7 +216,10 @@ export const usersRoutes = new Elysia()
                     body: userODT.update,
                     response: {
                         200: userODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Users']
+                    },
                 })
             .delete('/:id', async ({ db, params }) => {
                 const user = await db.users.delete({
@@ -192,13 +232,14 @@ export const usersRoutes = new Elysia()
                 , {
                     response: {
                         200: userODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Users']
+                    },
                 })
-            .use(cors({
-                origin: 'http://localhost:5173',
-                credentials: true,
-            }))
+
     })
+
 
 
 
@@ -215,7 +256,10 @@ export const factoriesRoutes = new Elysia()
                 {
                     response: {
                         200: t.Array(factoryODT.response)
-                    }
+                    },
+                    detail: {
+                        tags: ['Factories']
+                    },
                 })
             .post('/', async ({ db, body }) => {
                 const factory = await db.factories.create({
@@ -227,7 +271,10 @@ export const factoriesRoutes = new Elysia()
                     body: factoryODT.create,
                     response: {
                         200: factoryODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Factories']
+                    },
                 })
             .put('/:id', async ({ db, body, params }) => {
                 const factory = await db.factories.update({
@@ -243,7 +290,10 @@ export const factoriesRoutes = new Elysia()
                     body: factoryODT.create,
                     response: {
                         200: factoryODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Factories']
+                    },
                 })
             .delete('/:id', async ({ db, params }) => {
                 const factory = await db.factories.delete({
@@ -256,12 +306,12 @@ export const factoriesRoutes = new Elysia()
                 , {
                     response: {
                         200: factoryODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Factories']
+                    },
                 })
-            .use(cors({
-                origin: 'http://localhost:5173',
-                credentials: true,
-            }))
+
     })
 
 export const suppliersRoutes = new Elysia()
@@ -273,6 +323,12 @@ export const suppliersRoutes = new Elysia()
             .get('/', async (ctx) => {
                 const suppliers = await ctx.db.suppliers.findMany()
                 return suppliers
+            }, {
+
+                detail: {
+                    tags: ['Suppliers']
+                },
+
             })
             .post('/', async ({ db, body }) => {
                 const supplier = await db.suppliers.create({
@@ -283,7 +339,9 @@ export const suppliersRoutes = new Elysia()
                 {
 
                     body: supplierODT.create,
-
+                    detail: {
+                        tags: ['Suppliers']
+                    },
                 })
             .put('/:id', async ({ db, body, params }) => {
                 const supplier = await db.suppliers.update({
@@ -297,7 +355,9 @@ export const suppliersRoutes = new Elysia()
                 , {
 
                     body: supplierODT.create,
-
+                    detail: {
+                        tags: ['Suppliers']
+                    },
                 })
             .delete('/:id', async ({ db, params }) => {
                 const supplier = await db.suppliers.delete({
@@ -306,11 +366,12 @@ export const suppliersRoutes = new Elysia()
                     }
                 })
                 return supplier
+            }, {
+                detail: {
+                    tags: ['Suppliers']
+                },
             })
-            .use(cors({
-                origin: 'http://localhost:5173',
-                credentials: true,
-            }))
+
     })
 
 export const farmersRoutes = new Elysia()
@@ -326,7 +387,10 @@ export const farmersRoutes = new Elysia()
                 {
                     response: {
                         200: t.Array(farmerODT.response)
-                    }
+                    },
+                    detail: {
+                        tags: ['Farmers']
+                    },
                 })
             .post('/', async ({ db, body }) => {
                 const farmer = await db.farmers.create({
@@ -339,7 +403,10 @@ export const farmersRoutes = new Elysia()
                     body: farmerODT.create,
                     response: {
                         200: farmerODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Farmers']
+                    },
                 })
             .put('/:id', async ({ db, body, params }) => {
                 const farmer = await db.farmers.update({
@@ -355,7 +422,10 @@ export const farmersRoutes = new Elysia()
                     body: farmerODT.create,
                     response: {
                         200: farmerODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Farmers']
+                    },
                 })
             .delete('/:id', async ({ db, params }) => {
                 const farmer = await db.farmers.delete({
@@ -368,12 +438,12 @@ export const farmersRoutes = new Elysia()
                 , {
                     response: {
                         200: farmerODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Farmers']
+                    },
                 })
-            .use(cors({
-                origin: 'http://localhost:5173',
-                credentials: true,
-            }))
+
     })
 
 export const vehiclesRoutes = new Elysia()
@@ -389,6 +459,11 @@ export const vehiclesRoutes = new Elysia()
                     message: "Berhasil",
                     data: vehicles
                 }
+            }, {
+                detail: {
+                    tags: ['Vehicles']
+                },
+
             })
             .post('/', async ({ db, body }) => {
                 const vehicle = await db.vehicles.create({
@@ -401,7 +476,10 @@ export const vehiclesRoutes = new Elysia()
                     body: vehicleODT.create,
                     response: {
                         200: vehicleODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Vehicles']
+                    },
                 })
             .put('/:id', async ({ db, body, params }) => {
                 const vehicle = await db.vehicles.update({
@@ -416,7 +494,10 @@ export const vehiclesRoutes = new Elysia()
                     body: vehicleODT.create,
                     response: {
                         200: vehicleODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Vehicles']
+                    },
                 })
             .delete('/:id', async ({ db, params }) => {
                 const vehicle = await db.vehicles.delete({
@@ -429,10 +510,10 @@ export const vehiclesRoutes = new Elysia()
                 , {
                     response: {
                         200: vehicleODT.response
-                    }
+                    },
+                    detail: {
+                        tags: ['Vehicles']
+                    },
                 })
-            .use(cors({
-                origin: 'http://localhost:5173',
-                credentials: true,
-            }))
+
     })
