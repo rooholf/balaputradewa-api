@@ -1,38 +1,20 @@
-FROM debian:11.6-slim as builder
+FROM oven/bun:latest
+WORKDIR /usr/src/app
 
-WORKDIR /app
+# Install nodejs using n
+RUN apt-get -y update; apt-get -y install curl
+ARG NODE_VERSION=18
+RUN curl -L https://raw.githubusercontent.com/tj/n/master/bin/n -o n \
+    && bash n $NODE_VERSION \
+    && rm n \
+    && npm install -g n
 
-RUN apt update
-RUN apt install curl unzip -y
-
-RUN curl https://bun.sh/install | bash
-
-COPY package.json .
-COPY bun.lockb .
-
-COPY prisma .
-
-RUN /root/.bun/bin/bun install --production 
-RUN /root/.bun/bin/bun run prisma migrate deploy
-
-
-# ? -------------------------
-FROM gcr.io/distroless/base
-
-WORKDIR /app
-
-COPY --from=builder /root/.bun/bin/bun bun
-COPY --from=builder /app/node_modules node_modules
-
-
-COPY src src
-COPY tsconfig.json .
-COPY prisma prisma
-# COPY public public
-
-
+COPY bun.lockb package.json ./
+RUN bun install
+# You must ensure that schema.prisma is already in the directory
+COPY . .
+RUN bunx prisma generate
 
 ENV NODE_ENV production
-CMD ["./bun", "src/index.ts"]
-
-EXPOSE 3000
+ENV PORT 3000
+ENTRYPOINT [ "bun", "run", "dev" ]
