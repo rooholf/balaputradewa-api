@@ -18,12 +18,6 @@ const app = new Elysia({
         description: 'Elysia API Documentation',
         version: '1.0.0',
       },
-      servers: [
-        {
-          url: 'http://localhost:3000',
-          description: 'Local server',
-        },
-      ],
       tags: [
         {
           name: 'Auth',
@@ -90,4 +84,5 @@ const app = new Elysia({
   })
 
 // `server` will be null if listen isn't called
+
 console.log(`Running at http://${app.server!.hostname}:${app.server!.port}`)
