@@ -1,11 +1,10 @@
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import { swagger } from '@elysiajs/swagger'
-import { userODT, vehicleODT } from './model'
 import { jwt } from '@elysiajs/jwt'
 import { cookie } from '@elysiajs/cookie'
 import { cors } from '@elysiajs/cors'
-import { authRoutes, factoriesRoutes, farmersRoutes, suppliersRoutes, usersRoutes, vehiclesRoutes } from './routes'
-import { isAuthenticated } from './auth'
+import { authRoutes, factoriesRoutes, farmersRoutes, suppliersRoutes, usersRoutes, vehiclesRoutes } from './routes/*'
+import { isAuthenticated } from './middleware/auth'
 
 
 const app = new Elysia({
@@ -17,6 +16,7 @@ const app = new Elysia({
         title: 'Elysia API',
         description: 'Elysia API Documentation',
         version: '1.0.0',
+
       },
       tags: [
         {

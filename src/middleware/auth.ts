@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { ctx } from "./context";
+import { ctx } from "../context/context";
 import jwt from "@elysiajs/jwt";
 import bearer from "@elysiajs/bearer";
 
