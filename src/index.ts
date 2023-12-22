@@ -3,7 +3,7 @@ import { swagger } from '@elysiajs/swagger'
 import { jwt } from '@elysiajs/jwt'
 import { cookie } from '@elysiajs/cookie'
 import { cors } from '@elysiajs/cors'
-import { authRoutes, factoriesRoutes, farmersRoutes, suppliersRoutes, usersRoutes, vehiclesRoutes } from './routes/*'
+import { authRoutes, factoryRoutes, factoryInvoicesRoutes, farmersRoutes, supplierInvoiceRoutes, suppliersRoutes, usersRoutes, vehiclesRoutes, bankAccount, bankTransactions } from './routes/*'
 import { isAuthenticated } from './middleware/auth'
 
 
@@ -11,12 +11,12 @@ const app = new Elysia({
   name: '@app/ctx',
 })
   .use(swagger({
+    path: '/v1/swagger',
     documentation: {
       info: {
         title: 'Elysia API',
         description: 'Elysia API Documentation',
         version: '1.0.0',
-
       },
       tags: [
         {
@@ -70,13 +70,16 @@ const app = new Elysia({
       )
       .use(cookie())
       .use(authRoutes)
-      .use(isAuthenticated)
+      // .use(isAuthenticated)
       .use(usersRoutes)
-      .use(factoriesRoutes)
+      .use(factoryRoutes)
       .use(suppliersRoutes)
       .use(farmersRoutes)
       .use(vehiclesRoutes)
-
+      .use(bankAccount)
+      .use(bankTransactions)
+      .use(factoryInvoicesRoutes)
+      .use(supplierInvoiceRoutes)
   )
   .use(cors())
   .listen({

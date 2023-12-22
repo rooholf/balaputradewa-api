@@ -32,19 +32,25 @@ model Vehicles {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([id, plate])
 }
 
 model VehicleOrders {
-  id               Int          @id @default(autoincrement())
-  transaction_code String       @unique
-  date             DateTime     @db.Date
-  plate            String
-  transaction      Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  transactionId    Int
-  vehicle          Vehicles     @relation(fields: [plate], references: [plate], onDelete: Cascade, onUpdate: Cascade)
+  id              Int            @id @unique @default(autoincrement())
+  qty             Int
+  invCode         String         @unique
+  plate           String
+  vehicle         Vehicles       @relation(fields: [plate], references: [plate], onDelete: Cascade, onUpdate: Cascade)
+  supplierOrder   SupplierOrders @relation(fields: [supplierOrderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  supplierOrderId Int
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+  FactoryOrders   FactoryOrders? @relation(fields: [factoryOrdersId], references: [id])
+  factoryOrdersId Int?
+
+  @@index([id, plate])
 }
 
 model Suppliers {
@@ -58,55 +64,82 @@ model Suppliers {
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([id, code])
 }
 
 model SupplierOrders {
-  id               Int          @id @default(autoincrement())
-  transaction_code String       @unique
-  date             DateTime     @db.Date
-  transaction      Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  transactionId    Int
-  supplier         Suppliers    @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id               Int               @id @unique @default(autoincrement())
+  invCode          String            @unique
+  invDate          DateTime          @db.Date
+  invTotal         Int
+  qty              Int
   supplierId       Int
+  supplier         Suppliers         @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  factoryPriceId   Int?
+  factoryPrice     FactoryPrices?    @relation(fields: [factoryPriceId], references: [id])
+  supplierPriceId  Int
+  supplierPrice    SupplierPrices    @relation(fields: [supplierPriceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  status           String
+  BankTransactions BankTransactions?
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+  VehicleOrders VehicleOrders[]
+
+  @@index([id, invCode])
 }
 
 model SupplierPrices {
-  id         Int       @id @default(autoincrement())
-  price      Int
-  isPPN      Boolean
-  supplier   Suppliers @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  supplierId Int
+  id             Int           @id @default(autoincrement())
+  price          Int
+  isPPN          Boolean
+  supplier       Suppliers     @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  supplierId     Int
+  factoryPrice   FactoryPrices @relation(fields: [factoryPriceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  factoryPriceId Int
 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+  SupplierOrders SupplierOrders[]
+
+  @@index([id])
 }
 
 model Factories {
-  id        Int             @id @default(autoincrement())
-  code      String          @unique
-  name      String
-  prices    FactoryPrices[]
-  suppliers Suppliers[]
-  orders    FactoryOrders[]
+  id           Int             @id @unique @default(autoincrement())
+  code         String          @unique
+  name         String
+  prices       FactoryPrices[]
+  suppliers    Suppliers[]
+  orders       FactoryOrders[]
+  bankAccounts BankAccounts[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([id, code])
 }
 
 model FactoryOrders {
-  id             Int          @id @default(autoincrement())
-  kode_transaksi String       @unique
-  tanggal        DateTime     @db.Date
-  transaction    Transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  transactionId  Int
-  factory        Factories    @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id             Int             @id @default(autoincrement())
+  invCode        String          @unique
+  invDate        DateTime        @db.Date
+  invTotal       Int
+  qty            Int
   factoryId      Int
+  factory        Factories       @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  factoryPriceId Int?
+  factoryPrice   FactoryPrices?  @relation(fields: [factoryPriceId], references: [id])
+  vehicleOrders  VehicleOrders[]
+
+  status           String
+  BankTransactions BankTransactions?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([id, invCode])
 }
 
 model FactoryPrices {
@@ -115,38 +148,79 @@ model FactoryPrices {
   factory   Factories @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   factoryId Int
 
+  SupplierOrders SupplierOrders[]
+  SupplierPrices SupplierPrices[]
+  FactoryOrders  FactoryOrders[]
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([id])
 }
 
 model Farmers {
-  id         Int      @id @default(autoincrement())
-  code       String   @unique
-  name       String
-  address    String
-  phone      String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
+  id            Int           @id @default(autoincrement())
+  code          String        @unique
+  name          String
+  address       String
+  phone         String
   farmer_orders FarmerOrder[]
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+
+  @@index([id, code])
 }
 
 model FarmerOrder {
-  id         Int      @id @default(autoincrement())
-  code       String   @unique
-  date       DateTime @db.Date
-  farmer     Farmers  @relation(fields: [farmerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  farmerId   Int
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id               Int                @id @default(autoincrement())
+  transactionCode  String             @unique
+  transactionDate  DateTime           @db.Date
+  transactionTotal Int
+  transactionType  String
+  farmer           Farmers            @relation(fields: [farmerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  farmerId         Int
+  BankTransactions BankTransactions[]
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+
+  @@index([id, transactionCode])
 }
 
-model Transactions {
-  id             Int              @id @default(autoincrement())
-  kode           String           @unique
-  created_at     DateTime         @default(now())
-  updated_at     DateTime         @updatedAt
-  vehicleOrders  VehicleOrders[]
-  supplierOrders SupplierOrders[]
-  factoryOrders  FactoryOrders[]
+model BankAccounts {
+  id            Int    @id @default(autoincrement())
+  accountName   String
+  accountNumber String @unique
+  bankName      String
+  balance       Int
+
+  bankTransactions BankTransactions[]
+
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  Factories   Factories? @relation(fields: [factoriesId], references: [id])
+  factoriesId Int?
+
+  @@index([id, accountNumber])
+}
+
+model BankTransactions {
+  id              Int      @id @default(autoincrement())
+  transactionDate DateTime @db.Date
+  transactionCode String   @unique
+  transactionType String
+  amount          Int
+
+  bankAccounts    BankAccounts    @relation(fields: [bankAccountId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  bankAccountId   Int
+  supplierOrder   SupplierOrders? @relation(fields: [supplierInvCode], references: [invCode])
+  supplierInvCode String?         @unique
+  factoryOrder    FactoryOrders?  @relation(fields: [factoryInvCode], references: [invCode])
+  factoryInvCode  String?         @unique
+  farmerOrder     FarmerOrder?    @relation(fields: [farmerOrderId], references: [id])
+  farmerOrderId   Int?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([id])
 }

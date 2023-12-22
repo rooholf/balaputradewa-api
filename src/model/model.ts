@@ -1,38 +1,38 @@
 import { t } from 'elysia';
 
 export const userODT = {
-    'sign': t.Object({
-      email: t.String(),
-      password: t.String()
+  'sign': t.Object({
+    email: t.String(),
+    password: t.String()
+  }),
+  'create': t.Object({
+    email: t.String(),
+    password: t.String({
+      minLength: 8
     }),
-    'create': t.Object({
-      email: t.String(),
-      password: t.String({
-        minLength: 8
-      }),
-      name: t.String(),
-      role: t.String({
-        enum: ['admin', 'user']
-      })
+    name: t.String(),
+    role: t.String({
+      enum: ['admin', 'user']
+    })
+  }),
+  'response': t.Object({
+    id: t.Number(),
+    email: t.String(),
+    name: t.String(),
+    role: t.String({
+      enum: ['admin', 'user']
     }),
-    'response': t.Object({ 
-      id: t.Number(),
-      email: t.String(),
-      name: t.String(),
-      role: t.String({
-        enum: ['admin', 'user']
-      }),
-    }),
-    'update': t.Object({
-      email: t.Optional(t.String()),
-      password: t.Optional(t.String({
-        minLength: 8
-      })),
-      name: t.Optional(t.String()),
-      role: t.Optional(t.String({
-        enum: ['admin', 'user']
-      }))
-    }),
+  }),
+  'update': t.Object({
+    email: t.Optional(t.String()),
+    password: t.Optional(t.String({
+      minLength: 8
+    })),
+    name: t.Optional(t.String()),
+    role: t.Optional(t.String({
+      enum: ['admin', 'user']
+    }))
+  }),
 };
 
 

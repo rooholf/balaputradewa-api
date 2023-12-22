@@ -13,7 +13,7 @@ export const usersRoutes = new Elysia()
             .use(ctx)
             .get('/', async ({ db, query, set }) => {
 
-                const { _page, _end, _sort, _order } = query;
+                const { _page, _end, _sort, _order, q } = query;
                 const limit = +(_end ?? 10);
                 const offset = (+(_page ?? 1) - 1) * limit;
                 const sort = (_sort ?? 'id').toString();
@@ -25,11 +25,26 @@ export const usersRoutes = new Elysia()
                         orderBy,
                         skip: offset,
                         take: limit,
+                        where: {
+                            OR: [
+                                {
+                                    email: {
+                                        contains: q ?? ''
+                                    }
+                                },
+                                {
+                                    name: {
+                                        contains: q ?? ''
+                                    }
+                                }
+                            ]
+                        },
                         select: {
                             id: true,
                             email: true,
                             name: true,
-                            role: true
+                            role: true,
+                            created_at: true,
                         }
                     }
                 )
@@ -41,7 +56,7 @@ export const usersRoutes = new Elysia()
                     },
                 }
             )
-            .get('/:id', async ({ db, params }) => {
+            .get('/show/:id', async ({ db, params }) => {
                 const user = await db.users.findUnique({
                     where: {
                         id: parseInt(params.id)

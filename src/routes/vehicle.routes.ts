@@ -11,7 +11,7 @@ export const vehiclesRoutes = new Elysia()
         return app
             .use(ctx)
             .get('/', async ({ db, query }) => {
-                const { _page, _end, _sort, _order } = query;
+                const { _page, _end, _sort, _order, q } = query;
                 const limit = +(_end ?? 10);
                 const offset = (+(_page ?? 1) - 1) * limit;
                 const sort = (_sort ?? 'id').toString();
@@ -23,6 +23,35 @@ export const vehiclesRoutes = new Elysia()
                         orderBy,
                         skip: offset,
                         take: limit,
+                        where: {
+                            OR: [
+                                {
+                                    plate: {
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
+                                    }
+                                },
+                                {
+                                    brand: {
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
+                                    }
+                                },
+                                {
+                                    color: {
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
+                                    }
+                                },
+                                {
+                                    chassis: {
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
+                                    }
+                                },
+
+                            ]
+                        },
                         select: {
                             id: true,
                             plate: true,
@@ -32,12 +61,34 @@ export const vehiclesRoutes = new Elysia()
                         }
                     }
                 )
+                return vehicles
             }, {
                 detail: {
                     tags: ['Vehicles']
                 },
 
             })
+            .get('/:id', async ({ db, params }) => {
+                const vehicle = await db.vehicles.findUnique({
+                    where: {
+                        id: parseInt(params.id)
+                    },
+                    select: {
+                        id: true,
+                        plate: true,
+                        color: true,
+                        brand: true,
+                        chassis: true,
+                    }
+                })
+                return vehicle
+            }
+                , {
+
+                    detail: {
+                        tags: ['Vehicles']
+                    },
+                })
             .post('/', async ({ db, body }) => {
                 const vehicle = await db.vehicles.create({
                     data: body
