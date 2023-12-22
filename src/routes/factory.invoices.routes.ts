@@ -8,7 +8,6 @@ import { ctx } from "../context/context";
 interface factoryOrder {
     factoryId: number;
     factoryPriceId: number;
-    status: string;
     bankAccountId: number;
     vehicleOrders: {
         vehicleId: number;
@@ -132,227 +131,6 @@ export const factoryInvoicesRoutes = new Elysia()
                 },
             })
 
-
-            .post('/', async ({ db, invoiceCode, body }) => {
-                const { ...rest } = body as factoryOrder;
-
-                let factoryPrice: { id: number; price: number; factoryId: number; created_at: Date; updated_at: Date; } | null;
-
-                if (rest!.factoryPriceId) {
-                    factoryPrice = await db.factoryPrices.findUnique({
-                        where: {
-                            id: rest!.factoryPriceId,
-                        },
-                    });
-                } else {
-                    factoryPrice = await db.factoryPrices.findFirst({
-                        where: {
-                            factoryId: rest!.factoryId,
-                        },
-                        orderBy: {
-                            created_at: 'desc',
-                        },
-                    });
-                }
-
-                const factory = await db.factories.findUnique({
-                    where: {
-                        id: rest!.factoryId,
-                    },
-                });
-
-                const factoryInvoiceCode = "INV/" + factory!.code + "/" + invoiceCode + Math.floor(Math.random() * 1000);
-
-                const getUniqueSuppliersFromVehicleOrders = rest!.vehicleOrders.map(async (vehicleOrder) => {
-                    const vehicle = db.vehicles.findUnique({
-                        where: {
-                            id: vehicleOrder.vehicleId,
-                        },
-                    });
-
-                    const supplier = db.suppliers.findUnique({
-                        where: {
-                            id: (await vehicle)!.supplierId,
-                        }
-                    })
-
-                    return (await supplier)!.id;
-                })
-
-
-                const idOfSuppliers = [...new Set(await Promise.all(getUniqueSuppliersFromVehicleOrders))];
-
-                const vehicleOrderQty = rest!.vehicleOrders.reduce((acc, cur) => {
-                    return acc + cur.qty;
-                }, 0);
-
-                const createSupplierOrders = idOfSuppliers.map(async (supplierId) => {
-                    const supplier = db.suppliers.findUnique({
-                        where: {
-                            id: supplierId,
-                        }
-                    })
-
-                    const supplierPrice = db.supplierPrices.findUnique({
-                        where: {
-                            id: (await supplier)!.id,
-                        }
-                    })
-
-                    const supplierInvoiceCode = "INV/" + (await supplier)!.code + "/" + invoiceCode + Math.floor(Math.random() * 1000);
-
-                    const createOrUpdateFactoryOrder = await db.factoryOrders.upsert({
-                        where: {
-                            invCode: factoryInvoiceCode,
-                        },
-                        create: {
-                            invCode: factoryInvoiceCode,
-                            invDate: new Date(),
-                            invTotal: (factoryPrice)!.price * vehicleOrderQty,
-                            factoryId: (factory)!.id,
-                            factoryPriceId: (factoryPrice)!.id,
-                            qty: vehicleOrderQty,
-                            status: 'Pending',
-                        },
-                        update: {
-                            status: 'Pending',
-                        }
-                    })
-
-                    // Create a bank transaction right after creating the factory order
-                    const newBankTransaction = await db.bankTransactions.create({
-                        data: {
-                            bankAccountId: rest!.bankAccountId,
-                            amount: createOrUpdateFactoryOrder.invTotal,
-                            transactionCode: "TRS/" + createOrUpdateFactoryOrder.invCode + "/" + Math.floor(Math.random() * 1000),
-                            transactionDate: new Date(),
-                            transactionType: 'Credit',
-                            factoryInvCode: createOrUpdateFactoryOrder.invCode,
-                        }
-                    })
-
-                    // Update the factory order status to 'Paid' right after creating the bank transaction
-                    const updateFactoryOrderStatus = await db.factoryOrders.update({
-                        where: {
-                            invCode: createOrUpdateFactoryOrder.invCode
-                        },
-                        data: {
-                            status: 'Paid'
-                        }
-                    })
-
-                    // Update the bank account balance
-                    const updateBankAccountBalance = await db.bankAccounts.update({
-                        where: {
-                            id: rest!.bankAccountId,
-                        },
-                        data: {
-                            balance: {
-                                increment: createOrUpdateFactoryOrder.invTotal
-                            }
-                        }
-                    })
-
-                    const createOrUpdateSupplierOrder = await db.supplierOrders.upsert({
-                        where: {
-                            invCode: supplierInvoiceCode,
-                        },
-                        create: {
-                            invCode: supplierInvoiceCode,
-                            invDate: new Date(),
-                            invTotal: (await supplierPrice)!.price * rest!.vehicleOrders.filter(order => {
-                                return supplierId === order.vehicleId
-                            }).reduce((acc, cur) => {
-                                return acc + cur.qty;
-                            }
-                                , 0),
-                            supplierId: (await supplier)!.id,
-                            supplierPriceId: (await supplierPrice)!.id,
-                            factoryPriceId: (factoryPrice)!.id,
-                            qty: rest!.vehicleOrders.filter(order => {
-                                return supplierId === order.vehicleId
-                            }).reduce((acc, cur) => {
-                                return acc + cur.qty;
-                            }
-                                , 0),
-                            status: 'Pending',
-                        },
-                        update: {
-                            status: 'Pending',
-                        }
-                    })
-
-                    const createVehicleOrder = rest!.vehicleOrders.map(async (vehicleOrder) => {
-                        const vehicle = await db.vehicles.findUnique({
-                            where: {
-                                id: vehicleOrder.vehicleId,
-                            },
-                        });
-                        const vehicleInvCode = "INV/" + (await vehicle)!.plate + "/" + invoiceCode++;
-
-
-                        if (vehicle!.supplierId === supplierId) {
-                            const createOrUpdateVehicleOrder = await db.vehicleOrders.upsert({
-                                where: { invCode: vehicleInvCode },
-                                create: {
-                                    factoryOrdersId: (await createOrUpdateFactoryOrder).id,
-                                    supplierOrderId: (await createOrUpdateSupplierOrder).id,
-                                    qty: vehicleOrder.qty,
-                                    invCode: vehicleInvCode,
-                                    plate: vehicle!.plate,
-                                },
-                                update: {
-                                    factoryOrdersId: (await createOrUpdateFactoryOrder).id,
-                                    supplierOrderId: (await createOrUpdateSupplierOrder).id,
-                                    qty: vehicleOrder.qty,
-
-                                }
-                            })
-                            return createOrUpdateVehicleOrder
-                        }
-                    })
-                    const resolvedVehicleOrders = await Promise.all(createVehicleOrder);
-
-                    return { createOrUpdateSupplierOrder, resolvedVehicleOrders };
-                })
-
-                const resolvedSupplierOrders = await Promise.all(createSupplierOrders);
-                const formattedData = resolvedSupplierOrders.map(({ createOrUpdateSupplierOrder, resolvedVehicleOrders }) => {
-                    return {
-                        supplierOrder: {
-                            invCode: createOrUpdateSupplierOrder.invCode,
-                            vehicleOrders: resolvedVehicleOrders.filter(Boolean).map(vehicleOrder => ({
-                                invCode: vehicleOrder!.invCode
-                            }))
-                        }
-                    };
-                });
-
-                return {
-                    message: "success",
-                    data: {
-                        invCode: factoryInvoiceCode,
-                        suppliers: formattedData,
-                    }
-                }
-            }, {
-                detail: {
-                    tags: ['Invoices Factory']
-                },
-                body: t.Object({
-                    factoryId: t.Number(),
-                    factoryPriceId: t.Optional(t.Number()),
-                    status: t.String(),
-                    vehicleOrders: t.Array(
-                        t.Object({
-                            vehicleId: t.Number(),
-                            qty: t.Number(),
-                        })
-                    ),
-                    bankAccountId: t.Number(),
-                }),
-            })
-
             .post('/:invCode', async ({ set, db, params, body }) => {
                 const { ...rest } = body;
 
@@ -427,7 +205,7 @@ export const factoryInvoicesRoutes = new Elysia()
                     },
                 })
 
-            .post('/test', async ({ db, invoiceCode, body }) => {
+            .post('/', async ({ db, invoiceCode, body }) => {
                 const { ...rest } = body as factoryOrder;
 
                 const factoryPricePromise = rest!.factoryPriceId
@@ -583,7 +361,6 @@ export const factoryInvoicesRoutes = new Elysia()
                 body: t.Object({
                     factoryId: t.Number(),
                     factoryPriceId: t.Optional(t.Number()),
-                    status: t.String(),
                     vehicleOrders: t.Array(
                         t.Object({
                             vehicleId: t.Number(),
