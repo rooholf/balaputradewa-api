@@ -1,4 +1,4 @@
-import Elysia from "elysia"
+import Elysia, { t } from "elysia"
 import { ctx } from "../context/context"
 import { vehicleODT } from "../model/model"
 
@@ -31,25 +31,6 @@ export const vehiclesRoutes = new Elysia()
                                         mode: 'insensitive'
                                     }
                                 },
-                                {
-                                    brand: {
-                                        contains: q ?? '',
-                                        mode: 'insensitive'
-                                    }
-                                },
-                                {
-                                    color: {
-                                        contains: q ?? '',
-                                        mode: 'insensitive'
-                                    }
-                                },
-                                {
-                                    chassis: {
-                                        contains: q ?? '',
-                                        mode: 'insensitive'
-                                    }
-                                },
-
                             ]
                         },
                         select: {
@@ -58,10 +39,34 @@ export const vehiclesRoutes = new Elysia()
                             color: true,
                             brand: true,
                             chassis: true,
+                            supplier: {
+                                select: {
+                                    id: true,
+                                    code: true,
+                                    name: true,
+                                    prices: {
+                                        select: {
+                                            id: true,
+                                            price: true,
+                                            isPPN: true,
+                                            created_at: true,
+                                        },
+                                        orderBy: {
+                                            created_at: 'desc'
+                                        },
+                                        take: 1,
+                                    }
+                                }
+                            }
                         }
                     }
                 )
-                return vehicles
+                const vehiclesWithPrice = vehicles.map((vehicle) => {
+                    const { supplier: { id, code, name, prices: [price] }, ...rest } = vehicle;
+                    return { ...rest, supplier: { id, code, name }, price };
+                });
+
+                return vehiclesWithPrice;
             }, {
                 detail: {
                     tags: ['Vehicles']
@@ -79,6 +84,25 @@ export const vehiclesRoutes = new Elysia()
                         color: true,
                         brand: true,
                         chassis: true,
+                        supplier: {
+                            select: {
+                                id: true,
+                                code: true,
+                                name: true,
+                                prices: {
+                                    select: {
+                                        id: true,
+                                        price: true,
+                                        isPPN: true,
+                                        created_at: true,
+                                    },
+                                    orderBy: {
+                                        created_at: 'desc'
+                                    },
+                                    take: 1,
+                                }
+                            }
+                        }
                     }
                 })
                 return vehicle
@@ -90,17 +114,39 @@ export const vehiclesRoutes = new Elysia()
                     },
                 })
             .post('/', async ({ db, body }) => {
+                const { plate, color, brand, chassis, supplierId } = body
+                const supplier = await db.suppliers.findUnique({
+                    where: {
+                        id: supplierId
+                    }
+                })
+                if (!supplier) {
+                    throw new Error('Supplier not found')
+                }
+
+                const vehicleExist = await db.vehicles.findFirst({
+                    where: {
+                        plate: plate
+                    }
+                })
+
+                if (vehicleExist) {
+                    throw new Error('Vehicle already exists')
+                }
+
                 const vehicle = await db.vehicles.create({
                     data: body
                 })
                 return vehicle
             },
                 {
-
-                    body: vehicleODT.create,
-                    response: {
-                        200: vehicleODT.response
-                    },
+                    body: t.Object({
+                        plate: t.String(),
+                        color: t.String(),
+                        brand: t.String(),
+                        chassis: t.String(),
+                        supplierId: t.Number(),
+                    }),
                     detail: {
                         tags: ['Vehicles']
                     },

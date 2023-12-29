@@ -1,13 +1,15 @@
 import Elysia, { t } from "elysia";
-import { v4 as uuidv4 } from 'uuid';
 import { ctx } from "../context/context";
+import { Prisma } from "@prisma/client";
 
 
 
 
 interface factoryOrder {
     factoryId: number;
-    factoryPriceId: number;
+    factoryPriceId?: number;
+    noRef: string;
+    transactionDate?: string;
     bankAccountId: number;
     vehicleOrders: {
         vehicleId: number;
@@ -23,7 +25,7 @@ export const factoryInvoicesRoutes = new Elysia()
     .group('/invoices/factory', (app) => {
         return app
             .get('/', async ({ db, query }) => {
-                const { _page, _end, _sort, _order, q } = query;
+                const { _page, _end, _sort, _order, _status, created_at_gte, created_at_lte, q } = query;
                 const limit = +(_end ?? 10);
                 const offset = (+(_page ?? 1) - 1) * limit;
                 const sort = (_sort ?? 'id').toString();
@@ -31,31 +33,35 @@ export const factoryInvoicesRoutes = new Elysia()
 
                 const orderBy = { [sort]: order };
 
+                const whereConditions = [];
+
+                if (q) {
+                    const invTotalNumber = parseInt(q);
+                    if (!isNaN(invTotalNumber)) {
+                        whereConditions.push({ invTotal: { equals: invTotalNumber } });
+                    }
+                    whereConditions.push({ invCode: { contains: q, mode: 'insensitive' as Prisma.QueryMode } });
+                }
+
+                if (_status) {
+                    whereConditions.push({ status: { equals: _status, mode: 'insensitive' as Prisma.QueryMode } });
+                }
+
+                if (created_at_lte || created_at_gte) {
+                    whereConditions.push({
+                        invDate: {
+                            lte: created_at_lte ? new Date(created_at_lte) : undefined,
+                            gte: created_at_gte ? new Date(created_at_gte) : undefined
+                        }
+                    });
+                }
+
                 const invoices = await db.factoryOrders.findMany(
                     {
                         orderBy,
                         skip: offset,
                         take: limit,
-                        where: {
-                            OR: [
-                                {
-                                    invCode: {
-                                        contains: q ?? ''
-                                    },
-                                },
-                                {
-                                    invTotal: {
-                                        equals: parseInt(q ?? '0')
-                                    },
-                                },
-                                {
-                                    invDate: {
-                                        lte: q ? new Date(q) : undefined,
-                                        gte: q ? new Date(q) : undefined
-                                    },
-                                }
-                            ]
-                        },
+                        where: whereConditions.length > 0 ? { OR: whereConditions } : {},
                         select: {
                             id: true,
                             invCode: true,
@@ -75,9 +81,19 @@ export const factoryInvoicesRoutes = new Elysia()
                                     price: true,
                                 }
                             },
+                            vehicleOrders: {
+                                select: {
+                                    id: true,
+                                    qty: true,
+                                    plate: true,
+                                }
+                            },
                         }
                     }
                 )
+
+
+
                 return invoices
             }, {
                 detail: {
@@ -132,7 +148,7 @@ export const factoryInvoicesRoutes = new Elysia()
             })
 
             .post('/:invCode', async ({ set, db, params, body }) => {
-                const { ...rest } = body;
+                const { ...rest } = body as factoryOrder;
 
                 const decodedInvCode = decodeURIComponent(params.invCode);
 
@@ -140,6 +156,19 @@ export const factoryInvoicesRoutes = new Elysia()
                     where: {
                         invCode: decodedInvCode
                     },
+                    select: {
+                        id: true,
+                        invCode: true,
+                        invTotal: true,
+                        status: true,
+                        factory: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        },
+                    }
                 });
 
                 if (factoryOrder!.status === 'Paid') {
@@ -152,8 +181,9 @@ export const factoryInvoicesRoutes = new Elysia()
                         bankAccountId: rest!.bankAccountId,
                         amount: factoryOrder!.invTotal,
                         transactionCode: "TRS/" + factoryOrder!.invCode + "/" + Math.floor(Math.random() * 1000),
-                        transactionDate: new Date(),
+                        transactionDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
                         transactionType: 'Credit',
+                        description: 'Pembayaran Dari Pabrik ' + factoryOrder!.factory!.name + ' Untuk Invoice ' + factoryOrder!.invCode,
                         factoryInvCode: factoryOrder!.invCode,
                     }
                 })
@@ -186,6 +216,7 @@ export const factoryInvoicesRoutes = new Elysia()
                 },
                 body: t.Object({
                     bankAccountId: t.Number(),
+                    transactionDate: t.Optional(t.String()),
                 }),
             })
 
@@ -219,14 +250,16 @@ export const factoryInvoicesRoutes = new Elysia()
 
                 const [factoryPrice, factory] = await Promise.all([factoryPricePromise, factoryPromise]);
 
-                const factoryInvoiceCode = `INV/${factory!.code}/${invoiceCode}${uuidv4()}`;
+                const factoryInvoiceCode = `INV-${factory!.code}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+
                 const vehicleOrderQty = rest!.vehicleOrders.reduce((acc, cur) => acc + cur.qty, 0);
 
                 const createOrUpdateFactoryOrderPromise = db.factoryOrders.upsert({
                     where: { invCode: factoryInvoiceCode },
                     create: {
                         invCode: factoryInvoiceCode,
-                        invDate: new Date(),
+                        invDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
+                        noRef: rest!.noRef,
                         invTotal: factoryPrice!.price * vehicleOrderQty,
                         factoryId: factory!.id,
                         factoryPriceId: factoryPrice!.id,
@@ -242,11 +275,112 @@ export const factoryInvoicesRoutes = new Elysia()
                         bankAccountId: rest!.bankAccountId,
                         amount: createOrUpdateFactoryOrder.invTotal,
                         transactionCode: `TRS/${createOrUpdateFactoryOrder.invCode}/${Math.floor(Math.random() * 1000)}`,
-                        transactionDate: new Date(),
-                        transactionType: 'Credit',
+                        transactionDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
+                        transactionType: 'Debit',
+                        description: 'Pembayaran Dari Pabrik ' + factory?.name + ' Untuk Invoice ' + factoryInvoiceCode,
                         factoryInvCode: createOrUpdateFactoryOrder.invCode,
                     }
                 });
+
+
+
+
+
+                const vehicleOrders = rest!.vehicleOrders;
+                const vehiclePromises = vehicleOrders.map(order => db.vehicles.findUnique({ where: { id: order.vehicleId } }));
+                const vehicles = await Promise.all(vehiclePromises);
+
+                const groupedVehicleOrders = vehicles.reduce((acc, vehicle, index) => {
+                    const existingOrders = acc[vehicle!.supplierId] || [];
+                    existingOrders.push(vehicleOrders[index]);
+                    acc[vehicle!.supplierId] = existingOrders;
+                    return acc;
+                }, {} as Record<number, typeof vehicleOrders>);
+
+
+
+                const createSupplierOrders = Object.entries(groupedVehicleOrders).map(async ([supplierId, vehicleOrders]) => {
+                    // Fetch the supplier and supplierPrice
+                    const supplierPromise = db.suppliers.findUnique({ where: { id: Number(supplierId) } });
+                    // Get the supplierPrice based on the transactionDate if available, or get the latest price
+                    const supplierPricePromise = await db.supplierPrices.findFirst({
+                        where: {
+                            supplierId: Number(supplierId),
+                            OR: [
+                                { created_at: { lte: rest.transactionDate ? new Date(rest.transactionDate) : new Date() } },
+                                { created_at: { gte: rest.transactionDate ? new Date(rest.transactionDate) : new Date() } },
+                            ]
+                        },
+                        orderBy: { created_at: 'desc' },
+                    }).catch(async () => {
+                        return await db.supplierPrices.findFirst({
+                            where: {
+                                supplierId: Number(supplierId),
+                            },
+                            orderBy: { created_at: 'desc' },
+                        });
+                    });
+
+                    const [supplier, supplierPrice] = await Promise.all([supplierPromise, supplierPricePromise]);
+
+                    // Generate the supplierInvoiceCode
+                    const supplierInvoiceCode = `INV-${supplier!.code}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+
+                    // Calculate the supplierOrderQty
+                    const supplierOrderQty = vehicleOrders.reduce((acc, cur) => acc + cur.qty, 0);
+
+                    // Check if supplierPrice is null or supplierPrice.isPPN is null
+                    if (!supplierPrice || supplierPrice.isPPN === null) {
+                        throw new Error('Supplier price is null or isPPN is null');
+                    }
+
+                    // Create or update the supplierOrder
+                    const createOrUpdateSupplierOrderPromise = db.supplierOrders.upsert({
+                        where: { invCode: supplierInvoiceCode },
+                        create: {
+                            invCode: supplierInvoiceCode,
+                            invDate: new Date(),
+                            invTotal: !supplierPrice.isPPN ? (supplierPrice.price * supplierOrderQty) : (supplierPrice.price * supplierOrderQty * 1.11),
+                            supplierId: supplier!.id,
+                            supplierPriceId: supplierPrice!.id,
+                            factoryPriceId: factoryPrice!.id,
+                            factoryOrderId: createOrUpdateFactoryOrder.id,
+                            qty: supplierOrderQty,
+                            status: 'Pending',
+                        },
+                        update: { status: 'Pending' },
+                    });
+
+                    const [createOrUpdateSupplierOrder] = await Promise.all([createOrUpdateSupplierOrderPromise]);
+
+                    // Create the vehicleOrders
+                    const createVehicleOrderPromises = vehicleOrders.map(async (vehicleOrder) => {
+                        const vehicleInvCode = `INV-VOR-${vehicleOrder.vehicleId}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+
+                        // Fetch the vehicle from the database
+                        const vehicle = await db.vehicles.findUnique({ where: { id: vehicleOrder.vehicleId } });
+
+                        return db.vehicleOrders.upsert({
+                            where: { invCode: vehicleInvCode },
+                            create: {
+                                factoryOrdersId: createOrUpdateFactoryOrder.id,
+                                supplierOrderId: createOrUpdateSupplierOrder.id,
+                                qty: vehicleOrder.qty,
+                                invCode: vehicleInvCode,
+                                plate: vehicle?.plate ?? '', // Use the plate from the fetched vehicle or default to an empty string
+                            },
+                            update: {}
+                        });
+                    });
+
+                    const resolvedVehicleOrders = await Promise.all(createVehicleOrderPromises);
+
+                    return { createOrUpdateSupplierOrder, resolvedVehicleOrders };
+                });
+
+                const resolvedSupplierOrders = await Promise.all(createSupplierOrders);
+
+
 
                 const updateFactoryOrderStatusPromise = db.factoryOrders.update({
                     where: { invCode: createOrUpdateFactoryOrder.invCode },
@@ -264,82 +398,11 @@ export const factoryInvoicesRoutes = new Elysia()
                     updateBankAccountBalancePromise
                 ]);
 
-                const vehicleOrders = rest!.vehicleOrders;
-                const vehiclePromises = vehicleOrders.map(order => db.vehicles.findUnique({ where: { id: order.vehicleId } }));
-                const vehicles = await Promise.all(vehiclePromises);
-
-                const groupedVehicleOrders = vehicles.reduce((acc, vehicle, index) => {
-                    const existingOrders = acc[vehicle!.supplierId] || [];
-                    existingOrders.push(vehicleOrders[index]);
-                    acc[vehicle!.supplierId] = existingOrders;
-                    return acc;
-                }, {} as Record<number, typeof vehicleOrders>);
-
-                const createSupplierOrders = Object.entries(groupedVehicleOrders).map(async ([supplierId, vehicleOrders]) => {
-                    // Fetch the supplier and supplierPrice
-                    const supplierPromise = db.suppliers.findUnique({ where: { id: Number(supplierId) } });
-                    const supplierPricePromise = db.supplierPrices.findUnique({ where: { id: Number(supplierId) } });
-
-                    const [supplier, supplierPrice] = await Promise.all([supplierPromise, supplierPricePromise]);
-
-                    // Generate the supplierInvoiceCode
-                    const supplierInvoiceCode = `INV/${supplier!.code}/${invoiceCode}${Math.floor(Math.random() * 1000)}`;
-
-                    // Calculate the supplierOrderQty
-                    const supplierOrderQty = vehicleOrders.reduce((acc, cur) => acc + cur.qty, 0);
-
-                    // Create or update the supplierOrder
-                    const createOrUpdateSupplierOrderPromise = db.supplierOrders.upsert({
-                        where: { invCode: supplierInvoiceCode },
-                        create: {
-                            invCode: supplierInvoiceCode,
-                            invDate: new Date(),
-                            invTotal: supplierPrice!.price * supplierOrderQty,
-                            supplierId: supplier!.id,
-                            supplierPriceId: supplierPrice!.id,
-                            factoryPriceId: factoryPrice!.id,
-                            qty: supplierOrderQty,
-                            status: 'Pending',
-                        },
-                        update: { status: 'Pending' },
-                    });
-
-                    const [createOrUpdateSupplierOrder] = await Promise.all([createOrUpdateSupplierOrderPromise]);
-
-                    // Create the vehicleOrders
-                    const createVehicleOrderPromises = vehicleOrders.map(async (vehicleOrder) => {
-                        const vehicleInvCode = `INV/${vehicleOrder.vehicleId}/${invoiceCode++}`;
-
-                        // Fetch the vehicle from the database
-                        const vehicle = await db.vehicles.findUnique({ where: { id: vehicleOrder.vehicleId } });
-
-                        return db.vehicleOrders.upsert({
-                            where: { invCode: vehicleInvCode },
-                            create: {
-                                factoryOrdersId: createOrUpdateFactoryOrder.id,
-                                supplierOrderId: createOrUpdateSupplierOrder.id,
-                                qty: vehicleOrder.qty,
-                                invCode: vehicleInvCode,
-                                plate: vehicle?.plate ?? '', // Use the plate from the fetched vehicle or default to an empty string
-                            },
-                            update: {
-                                factoryOrdersId: createOrUpdateFactoryOrder.id,
-                                supplierOrderId: createOrUpdateSupplierOrder.id,
-                                qty: vehicleOrder.qty,
-                            }
-                        });
-                    });
-
-                    const resolvedVehicleOrders = await Promise.all(createVehicleOrderPromises);
-
-                    return { createOrUpdateSupplierOrder, resolvedVehicleOrders };
-                });
-
-                const resolvedSupplierOrders = await Promise.all(createSupplierOrders);
                 const formattedData = resolvedSupplierOrders.map(({ createOrUpdateSupplierOrder, resolvedVehicleOrders }) => {
                     return {
                         supplierOrder: {
                             invCode: createOrUpdateSupplierOrder.invCode,
+                            invTotal: createOrUpdateSupplierOrder.invTotal,
                             vehicleOrders: resolvedVehicleOrders.filter(Boolean).map(vehicleOrder => ({
                                 invCode: vehicleOrder!.invCode
                             }))
@@ -367,6 +430,8 @@ export const factoryInvoicesRoutes = new Elysia()
                             qty: t.Number(),
                         })
                     ),
+                    noRef: t.String(),
+                    transactionDate: t.String(),
                     bankAccountId: t.Number(),
                 }),
             })

@@ -66,17 +66,35 @@ export const farmersRoutes = new Elysia()
                     },
                 })
             .post('/', async ({ db, body }) => {
+                const { email, name, address, phone } = body;
+
+                const isEmailExist = await db.farmers.findUnique({
+                    where: {
+                        code: email
+                    }
+                })
+
+                if (isEmailExist) {
+                    throw new Error('Email already exist')
+                }
+
                 const farmer = await db.farmers.create({
-                    data: body
+                    data: {
+                        name,
+                        address,
+                        phone,
+                        code: email
+                    }
                 })
                 return farmer
             },
                 {
-
-                    body: farmerODT.create,
-                    response: {
-                        200: farmerODT.response
-                    },
+                    body: t.Object({
+                        email: t.String(),
+                        name: t.String(),
+                        address: t.String(),
+                        phone: t.String(),
+                    }),
                     detail: {
                         tags: ['Farmers']
                     },
@@ -92,13 +110,74 @@ export const farmersRoutes = new Elysia()
                         name: true,
                         address: true,
                         phone: true,
+                        farmer_orders: {
+                            select: {
+                                id: true,
+                                transactionCode: true,
+                                transactionTotal: true,
+                                transactionType: true,
+                                transactionDate: true,
+                                bankTransactions: {
+                                    select: {
+                                        id: true,
+                                        amount: true,
+                                        transactionType: true,
+                                        description: true,
+                                        transactionDate: true,
+                                    }
+                                },
+                            }
+                        },
                         created_at: true,
                     }
                 })
-                return farmer
+
+                if (farmer) {
+                    const { farmer_orders: farmerOrders, ...otherProps } = farmer;
+                    const bankTransactions = farmerOrders.flatMap(order => order.bankTransactions);
+                    const bankTransactionDescriptions = bankTransactions.map(transaction => transaction.description);
+                    return { ...otherProps, farmerOrders, description: bankTransactionDescriptions, bankTransactions };
+                }
+
+                return null;
             }
                 , {
 
+                    detail: {
+                        tags: ['Farmers']
+                    },
+                })
+
+            .get('/:id/transactions', async ({ db, params }) => {
+                const { id } = params;
+                const transactions = await db.farmerOrder.findMany({
+                    where: {
+                        farmerId: parseInt(id)
+                    },
+                    select: {
+                        id: true,
+                        transactionCode: true,
+                        transactionTotal: true,
+                        transactionType: true,
+                        transactionDate: true,
+                        bankTransactions: {
+                            select: {
+                                id: true,
+                                amount: true,
+                                transactionType: true,
+                                description: true,
+                                transactionDate: true,
+                            }
+                        },
+                        created_at: true,
+                    }
+                })
+                return transactions.map(transaction => ({
+                    ...transaction,
+                    description: transaction.bankTransactions[0]?.description // Return the description field from BankTransactions
+                }));
+            }
+                , {
                     detail: {
                         tags: ['Farmers']
                     },
@@ -140,12 +219,12 @@ export const farmersRoutes = new Elysia()
                     },
                 })
 
-            .post('/:id/order', async ({ db, params, body }) => {
-                const { farmerId, transactionTotal, transactionType, bankAccountId } = body;
+            .post('/:id/order', async ({ db, params, body, invoiceCode }) => {
+                const { transactionTotal, transactionType, bankAccountId } = body;
 
                 const farmer = await db.farmers.findUnique({
                     where: {
-                        id: farmerId
+                        id: parseInt(params.id)
                     }
                 });
 
@@ -153,7 +232,7 @@ export const farmersRoutes = new Elysia()
                     throw new Error('Farmer not found');
                 }
 
-                const transactionCode = `INV/FAR/${farmerId}/${Date.now()}`;
+                const transactionCode = `INV-FAR-${farmer.name}-${invoiceCode}-${Math.floor(Math.random() * 1000) + 1}}`;
 
                 const farmerOrder = await db.farmerOrder.create({
                     data: {
@@ -176,10 +255,14 @@ export const farmersRoutes = new Elysia()
                 }
 
                 let newBalance = bankAccount!.balance;
-                if (transactionType === 'Debit') {
-                    newBalance -= transactionTotal;
-                } else if (transactionType === 'Credit') {
+                if (transactionType === 'Saving') {
                     newBalance += transactionTotal;
+                } else if (transactionType === 'Loan') {
+                    newBalance -= transactionTotal;
+                } else if (transactionType === 'Loan Payment') {
+                    newBalance += transactionTotal;
+                } else if (transactionType === 'Saving Withdrawal') {
+                    newBalance -= transactionTotal;
                 }
 
                 const bankTransaction = await db.bankTransactions.create({
@@ -187,8 +270,10 @@ export const farmersRoutes = new Elysia()
                         amount: transactionTotal,
                         transactionType: transactionType,
                         bankAccountId: bankAccount.id,
+                        description: `Transaction for ${farmer!.name}`,
                         transactionDate: new Date(), // Add transactionDate property
-                        transactionCode
+                        transactionCode,
+                        farmerOrderId: farmerOrder.id
                     }
                 });
 
@@ -206,7 +291,7 @@ export const farmersRoutes = new Elysia()
                 body: t.Object({
                     farmerId: t.Number(),
                     transactionTotal: t.Number(),
-                    transactionType: t.Union([t.Literal('Credit'), t.Literal('Debit')]),
+                    transactionType: t.Union([t.Literal('Saving'), t.Literal('Loan'), t.Literal('Loan Payment'), t.Literal('Saving Withdrawal')]),
                     bankAccountId: t.Number()
                 }),
                 detail: {

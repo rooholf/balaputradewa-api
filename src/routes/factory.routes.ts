@@ -74,16 +74,27 @@ export const factoryRoutes = new Elysia()
                     },
                 })
             .post('/', async ({ db, body }) => {
+                const { code, name, price } = body
                 const factory = await db.factories.create({
-                    data: body
+                    data: {
+                        code,
+                        name,
+                        prices: {
+                            create: {
+                                price: body.price
+                            }
+                        }
+                    }
                 })
                 return factory
             }
                 , {
-                    body: factoryODT.create,
-                    response: {
-                        200: factoryODT.response
-                    },
+                    body: t.Object({
+                        code: t.String(),
+                        name: t.String(),
+                        price: t.Number(),
+                    }),
+
                     detail: {
                         tags: ['Factories']
                     },
@@ -100,6 +111,7 @@ export const factoryRoutes = new Elysia()
                         suppliers: true,
                         prices: true,
                         orders: true,
+                        bankAccounts: true,
                     }
                 })
                 return factory

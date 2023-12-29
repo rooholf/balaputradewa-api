@@ -1,10 +1,7 @@
 import Elysia, { t } from "elysia";
 import { ctx } from "../context/context";
 
-
-
 export const bankAccount = new Elysia()
-
     .use(ctx)
     .group('/bank', (app) => {
         return app
@@ -65,10 +62,8 @@ export const bankAccount = new Elysia()
                     }
                 )
                 const count = await db.bankAccounts.count()
-                return {
-                    data: bankAccounts,
-                    total: count
-                }
+                return bankAccounts;
+
             }, {
                 detail: {
                     tags: ['Bank Account']
@@ -92,7 +87,7 @@ export const bankAccount = new Elysia()
                         updated_at: true,
                     }
                 })
-                return bankAccount
+                return bankAccount;
             }, {
                 detail: {
                     tags: ['Bank Account']
@@ -100,12 +95,38 @@ export const bankAccount = new Elysia()
             })
 
             .post('/', async ({ db, body }) => {
+                const { accountNumber, accountName, bankName, balance } = body;
+
                 const bankAccount = await db.bankAccounts.create({
                     data: {
-                        ...body
+                        accountNumber,
+                        accountName,
+                        bankName,
+                        balance
                     }
                 })
-                return bankAccount
+
+                const bankTransaction = await db.bankTransactions.create({
+                    data: {
+                        amount: balance,
+                        transactionType: 'Debit',
+                        transactionDate: new Date(),
+                        transactionCode: "TRS-" + bankAccount.id + "-" + Math.floor(Math.random() * 1000),
+                        description: "Setoran awal",
+                        bankAccounts: {
+                            connect: {
+                                id: bankAccount.id
+                            }
+                        }
+                    }
+                })
+
+
+
+                return {
+                    bankAccount,
+                    bankTransaction
+                };
             }
                 , {
                     body: t.Object({
@@ -129,7 +150,7 @@ export const bankAccount = new Elysia()
                         ...body
                     }
                 })
-                return bankAccount
+                return bankAccount;
             }
                 , {
                     body: t.Object({
@@ -149,11 +170,168 @@ export const bankAccount = new Elysia()
                         id: parseInt(id)
                     }
                 })
-                return bankAccount
+                return bankAccount;
             }
                 , {
                     detail: {
                         tags: ['Bank Account']
                     },
                 })
+
+            .get('/:id/transactions', async ({ db, params }) => {
+                const { id } = params;
+                const bankAccount = await db.bankAccounts.findUnique({
+                    where: {
+                        id: parseInt(id)
+                    },
+                    select: {
+                        bankTransactions: {
+                            orderBy: {
+                                id: 'desc'
+                            }
+                        },
+                    }
+                })
+
+                const data = bankAccount?.bankTransactions.map((item) => item)
+                return data;
+            }
+                , {
+                    detail: {
+                        tags: ['Bank Account']
+                    },
+                })
+
+            .post('/:id/transactions', async ({ db, params, body, invoiceCode }) => {
+                const { id } = params;
+                const { amount, type, description, toBankAccountId } = body;
+
+                const bankAccount = await db.bankAccounts.findUnique({
+                    where: { id: parseInt(id) },
+                    select: { id: true, balance: true, bankName: true, accountName: true, accountNumber: true }
+                });
+
+
+
+                const { balance } = bankAccount ?? { balance: 0 }
+
+
+                const isTransfer = type === 'Transfer' ? true : false
+
+                const newBalance = type === 'Debit' ? balance + amount : balance - amount
+
+                let newDescription = ""
+
+                if (description) {
+                    newDescription = type === 'Debit' ? description : "Penarikan " + description
+                } else {
+                    newDescription = type === 'Debit' ? "Setoran " : "Penarikan "
+                }
+
+                if (!isTransfer) {
+                    const bankTransaction = await db.bankTransactions.create({
+                        data: {
+                            amount,
+                            transactionType: type,
+                            transactionDate: new Date(),
+                            transactionCode: "TRS-" + invoiceCode + "-" + Math.floor(Math.random() * 1000),
+                            description: newDescription,
+                            bankAccounts: {
+                                connect: {
+                                    id: parseInt(id)
+                                }
+                            }
+                        }
+                    })
+
+                    const updateBankAccount = await db.bankAccounts.update({
+                        where: {
+                            id: parseInt(id)
+                        },
+                        data: {
+                            balance: newBalance
+                        }
+                    })
+                    return {
+                        bankTransaction,
+                        updateBankAccount
+                    };
+                } else {
+                    if (type === 'Transfer') {
+                        if (!toBankAccountId) {
+                            throw new Error('Target bank account ID is required for transfers');
+                        }
+
+                        const targetBankAccount = await db.bankAccounts.findUnique({
+                            where: { id: toBankAccountId },
+                            select: { id: true, balance: true, bankName: true, accountName: true, accountNumber: true }
+                        });
+
+                        if (!targetBankAccount) {
+                            throw new Error('Target bank account not found');
+                        }
+
+                        // Check balance for current bank account
+                        if (balance < amount) {
+                            throw new Error('Insufficient balance');
+                        }
+
+
+                        // Decrease the balance of the current bank account
+                        await db.bankAccounts.update({
+                            where: { id: parseInt(id) },
+                            data: { balance: balance - amount }
+                        });
+
+                        // Increase the balance of the target bank account
+                        await db.bankAccounts.update({
+                            where: { id: toBankAccountId },
+                            data: { balance: targetBankAccount.balance + amount }
+                        });
+
+                        // Create a transaction for current bank 
+                        const bankTransaction = await db.bankTransactions.create({
+                            data: {
+                                amount,
+                                transactionType: type,
+                                transactionDate: new Date(),
+                                transactionCode: "TRS-" + invoiceCode + "-" + Math.floor(Math.random() * 1000),
+                                description: `Transfer Ke rekening ${targetBankAccount.bankName} ${targetBankAccount.accountNumber}`,
+                                bankAccounts: { connect: { id: parseInt(id) } }
+                            }
+                        });
+
+                        // Create a transaction for target bank
+                        if (bankAccount) {
+                            await db.bankTransactions.create({
+                                data: {
+                                    amount,
+                                    transactionType: type,
+                                    transactionDate: new Date(),
+                                    transactionCode: "TRS-" + invoiceCode + "-" + Math.floor(Math.random() * 1000),
+                                    description: `Transfer Dari rekening ${bankAccount.bankName} ${bankAccount.accountNumber}`,
+                                    bankAccounts: { connect: { id: toBankAccountId } }
+                                }
+                            });
+                        }
+
+
+                        return {
+                            bankTransaction
+                        };
+                    }
+                }
+            }
+                , {
+                    body: t.Object({
+                        amount: t.Number(),
+                        type: t.String(),
+                        description: t.Optional(t.String()),
+                        toBankAccountId: t.Optional(t.Number())
+                    }),
+                    detail: {
+                        tags: ['Bank Account']
+                    },
+                })
+
     })

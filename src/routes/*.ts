@@ -8,3 +8,7 @@ export * from './factory.invoices.routes';
 export * from './supplier.invoices.routes';
 export * from './bank.transactions.routes';
 export * from './bankAccount.routes';
+export * from './orders.routes';
+export * from './dailyOrders.routes';
+export * from './dailyRevenue.routes';
+export * from './product.routes'

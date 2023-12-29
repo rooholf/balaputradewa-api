@@ -1,7 +1,6 @@
 import Elysia, { t } from "elysia";
 import { ctx } from "../context/context";
-
-
+import moment from "moment";
 
 export const bankTransactions = new Elysia()
     .use(ctx)
@@ -16,7 +15,7 @@ export const bankTransactions = new Elysia()
 
                 const orderBy = { [sort]: order };
 
-                const bankAccounts = await db.bankAccounts.findMany(
+                const transactions = await db.bankTransactions.findMany(
                     {
                         orderBy,
                         skip: offset,
@@ -24,23 +23,24 @@ export const bankTransactions = new Elysia()
                         where: {
                             OR: [
                                 {
-                                    accountNumber: {
+                                    transactionCode: {
                                         contains: q ?? ''
                                     },
                                 },
                                 {
-                                    accountName: {
+                                    transactionType: {
                                         contains: q ?? ''
                                     },
                                 },
                                 {
-                                    bankName: {
-                                        contains: q ?? ''
+                                    transactionDate: {
+                                        lte: q ? new Date(q) : undefined,
+                                        gte: q ? new Date(q) : undefined
                                     },
                                 },
 
                                 {
-                                    balance: {
+                                    amount: {
                                         equals: parseInt(q ?? '0')
                                     },
                                 },
@@ -54,17 +54,18 @@ export const bankTransactions = new Elysia()
                         },
                         select: {
                             id: true,
-                            accountNumber: true,
-                            accountName: true,
-                            bankName: true,
-                            balance: true,
+                            transactionCode: true,
+                            transactionDate: true,
+                            transactionType: true,
+                            description: true,
+                            amount: true,
                             created_at: true,
                             updated_at: true,
-                            bankTransactions: true
                         }
                     }
                 )
-                return bankAccounts
+
+                return transactions
             }, {
 
                 detail: {
@@ -72,89 +73,247 @@ export const bankTransactions = new Elysia()
                 },
 
             })
+
+            .post('/', async ({ db, body }) => {
+                const { transactionType, amount, farmerOrderId, bankAccountId } = body;
+
+                const transaction = await db.bankTransactions.create({
+                    data: {
+                        transactionType,
+                        amount,
+                        description: `Transaction ${transactionType} for farmer order ${farmerOrderId}`,
+                        farmerOrderId,
+                        bankAccountId,
+                        transactionDate: new Date(),
+                        transactionCode: `TRX-${moment().format('YYYYMMDDHHmmss')}`,
+                    }
+                })
+
+
+                return transaction
+            }
+                , {
+                    detail: {
+                        tags: ['Bank Transaction']
+                    },
+                    body: t.Object({
+                        transactionType: t.String(),
+                        amount: t.Number(),
+                        farmerOrderId: t.Number(),
+                        bankAccountId: t.Number(),
+                    }),
+                })
+
+
             .get('/:id', async ({ db, params }) => {
-                const bankAccount = await db.bankAccounts.findUnique({
+                const { id } = params;
+                const transaction = await db.bankTransactions.findUnique({
                     where: {
-                        id: parseInt(params.id)
+                        id: parseInt(id)
                     },
                     select: {
                         id: true,
-                        accountNumber: true,
-                        accountName: true,
-                        bankName: true,
-                        balance: true,
+                        transactionCode: true,
+                        transactionDate: true,
+                        transactionType: true,
+                        supplierOrder: true,
+                        farmerOrder: true,
+                        factoryOrder: true,
+                        amount: true,
+                        supplierInvCode: true,
+                        factoryInvCode: true,
+                        farmerOrderId: true,
                         created_at: true,
                         updated_at: true,
-                        bankTransactions: true
                     }
                 })
-                return bankAccount
-            }, {
 
+                if (!transaction) {
+                    throw new Error('Transaction not found');
+                }
+
+                // Create a new object and only add properties that are not null
+                const filteredTransaction = Object.fromEntries(
+                    Object.entries(transaction).filter(([_, v]) => v != null)
+                );
+
+                return filteredTransaction;
+            }, {
                 detail: {
                     tags: ['Bank Transaction']
                 },
-
             })
-            .post('/', async ({ db, body }) => {
-                const { accountNumber, accountName, bankName, balance } = body;
-                const bank = await db.bankAccounts.create({
-                    data: {
-                        accountNumber,
-                        accountName,
-                        bankName,
-                        balance
-                    }
-                })
-                return bank
-            }
-                , {
-                    body: t.Object({
-                        accountNumber: t.String(),
-                        accountName: t.String(),
-                        bankName: t.String(),
-                        balance: t.Number(),
-                    }),
-                    detail: {
-                        tags: ['Bank Transaction']
-                    },
-                })
-            .put('/:id', async ({ db, params, body }) => {
-                const { id } = params;
-                const bankAccount = await db.bankAccounts.update({
-                    where: {
-                        id: parseInt(id)
-                    },
-                    data: {
-                        ...body
-                    }
-                })
-                return bankAccount
-            }
-                , {
-                    body: t.Object({
-                        accountNumber: t.String(),
-                        accountName: t.String(),
-                        bankName: t.String(),
-                    }),
-                    detail: {
-                        tags: ['Bank Transaction']
-                    },
-                })
 
-            .delete('/:id', async ({ db, params }) => {
-                const { id } = params;
-                const bankAccount = await db.bankAccounts.delete({
-                    where: {
-                        id: parseInt(id)
-                    }
-                })
-                return bankAccount
-            }
+            .get('/report', async ({ db, query }) => {
+                const { _startDate, _endDate, factoryId } = query;
 
-                , {
-                    detail: {
-                        tags: ['Bank Transaction']
+                let whereClause = {};
+
+                const gte = _startDate ? moment(_startDate).startOf('day') : moment().subtract(30, 'days').startOf('day');
+                const lte = _endDate ? moment(_endDate).endOf('day') : moment().endOf('day');
+
+
+                if (gte && lte) {
+                    whereClause = {
+                        transactionDate: {
+                            gte: new Date(gte.format()),
+                            lte: new Date(lte.format()),
+                        },
+                    };
+                }
+
+                const transactions = await db.bankTransactions.findMany({
+                    where: whereClause,
+                    select: {
+                        id: true,
+                        transactionCode: true,
+                        transactionDate: true,
+                        transactionType: true,
+                        supplierOrder: true,
+                        farmerOrder: true,
+                        factoryOrder: {
+                            select: {
+                                factoryId: true,
+                            }
+                        },
+                        amount: true,
+                        description: true,
+                        created_at: true,
+                        updated_at: true,
+                    }
+                });
+
+                const supplierTransactions = await db.supplierOrders.findMany({
+                    where: {
+                        invDate: {
+                            gte: new Date(gte.format()),
+                            lte: new Date(lte.format()),
+                        }
                     },
-                })
+                    select: {
+                        id: true,
+                        invCode: true,
+                        invDate: true,
+                        invTotal: true,
+                        status: true,
+                        supplier: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        },
+                        supplierPrice: {
+                            select: {
+                                id: true,
+                                price: true,
+                            }
+                        },
+                        created_at: true,
+                    }
+                });
+
+                const factoryTransactions = await db.factoryOrders.findMany({
+                    where: {
+                        invDate: {
+                            gte: new Date(gte.format()),
+                            lte: new Date(lte.format()),
+                        },
+                        factoryId: factoryId ? { equals: parseInt(factoryId) } : undefined // Add the factoryId condition
+                    },
+                    select: {
+                        id: true,
+                        invCode: true,
+                        invDate: true,
+                        invTotal: true,
+                        factory: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        },
+                        factoryPrice: {
+                            select: {
+                                id: true,
+                                price: true,
+                            }
+                        },
+                        BankTransactions: {
+                            select: {
+                                id: true,
+                                transactionCode: true,
+                                transactionDate: true,
+                                transactionType: true,
+                                amount: true,
+                                description: true,
+                                created_at: true,
+                            }
+                        },
+                        created_at: true,
+                    }
+                });
+
+
+
+                const pendingTransaction = supplierTransactions.filter((transaction) => transaction.status === 'Pending');
+
+                const sumPendingTransaction = pendingTransaction.reduce((acc, transaction) => {
+                    return acc + transaction.invTotal;
+                }, 0);
+
+
+                const grossIncome = transactions.reduce((acc, transaction) => {
+                    if (transaction.transactionType === 'Debit') {
+                        return acc + transaction.amount;
+                    } else {
+                        return acc;
+                    }
+                }
+                    , 0);
+
+                const countTransaction = transactions.reduce((acc, transaction) => {
+                    if (transaction.transactionType === 'Debit') {
+                        return acc + 1;
+                    } else {
+                        return acc;
+                    }
+                }
+                    , 0);
+
+                const profit = transactions.reduce((acc, transaction) => {
+                    if (transaction.transactionType === 'Debit') {
+                        return acc + transaction.amount;
+                    } else {
+                        return acc - transaction.amount;
+                    }
+                }, 0);
+
+                const cost = transactions.reduce((acc, transaction) => {
+                    if (transaction.transactionType === 'Credit') {
+                        return acc + transaction.amount;
+                    } else {
+                        return acc;
+                    }
+                }, 0);
+
+
+
+                return {
+                    data: transactions,
+                    pendingCost: sumPendingTransaction,
+                    grossIncome,
+                    profit,
+                    cost,
+                    countTransaction,
+                    gte,
+                    lte
+                };
+            }, {
+                detail: {
+                    tags: ['Bank Transaction']
+                },
+            })
+
     })
+

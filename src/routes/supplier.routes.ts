@@ -1,6 +1,7 @@
 import Elysia, { t } from "elysia"
 import { ctx } from "../context/context"
 import { supplierODT } from "../model/model"
+import { Prisma } from "@prisma/client"
 
 
 
@@ -27,12 +28,14 @@ export const suppliersRoutes = new Elysia()
                             OR: [
                                 {
                                     code: {
-                                        contains: q ?? ''
-                                    }
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
+                                    },
                                 },
                                 {
                                     name: {
-                                        contains: q ?? ''
+                                        contains: q ?? '',
+                                        mode: 'insensitive'
                                     }
                                 }
                             ]
@@ -49,7 +52,19 @@ export const suppliersRoutes = new Elysia()
                         }
                     }
                 )
-                return suppliers
+
+                const data = suppliers.map((supplier) => {
+                    const lastCreatedPrice = supplier.prices.slice(-1)[0];
+                    const isPPN = lastCreatedPrice?.isPPN ?? false;
+                    return {
+                        ...supplier,
+                        isPPN,
+                        lastCreatedPrice,
+                    };
+                });
+
+
+                return data
             }, {
 
                 detail: {
@@ -66,6 +81,9 @@ export const suppliersRoutes = new Elysia()
                         id: true,
                         code: true,
                         name: true,
+                        supplierOrders: true,
+                        prices: true,
+                        vehicles: true,
                         created_at: true,
                     }
                 })
@@ -77,31 +95,137 @@ export const suppliersRoutes = new Elysia()
                         tags: ['Suppliers']
                     },
                 })
+
+            .get('/:id/orders', async ({ db, params }) => {
+                const { id } = params;
+                const orders = await db.supplierOrders.findMany({
+                    where: {
+                        supplierId: parseInt(id)
+                    },
+                    select: {
+                        id: true,
+                        invCode: true,
+                        invTotal: true,
+                        invDate: true,
+                        status: true,
+                        supplier: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            }
+                        },
+                        supplierPrice: {
+                            select: {
+                                id: true,
+                                price: true,
+                            }
+                        },
+                        created_at: true,
+                    }
+                })
+                return orders
+            }
+                , {
+
+                    detail: {
+                        tags: ['Suppliers']
+                    },
+                })
+
             .post('/', async ({ db, body }) => {
+                const { code, name, factoryId, address, price, isPPN, productId } = body
+
+                const latestFactoryPrice = await db.factoryPrices.findFirst({
+                    where: {
+                        factoryId: factoryId,
+                    },
+                    orderBy: {
+                        created_at: 'desc',
+                    },
+                });
+
+                if (latestFactoryPrice!.price < body.price) {
+                    throw new Error('Supplier price is higher than factory price');
+                }
+
                 const supplier = await db.suppliers.create({
-                    data: body
+                    data: {
+                        code,
+                        name,
+                        prices: {
+                            create: {
+                                price,
+                                isPPN,
+                                factoryPrice: {
+                                    connect: {
+                                        id: latestFactoryPrice!.id,
+                                    },
+                                },
+                            } as Prisma.SupplierPricesCreateWithoutSupplierInput
+                        },
+                        address,
+                        factories: {
+                            connect: {
+                                id: factoryId
+                            }
+                        },
+                        products: {
+                            connect: {
+                                id: productId
+                            }
+                        }
+                    },
+
                 })
                 return supplier
             },
                 {
 
-                    body: supplierODT.create,
+                    body: t.Object({
+                        code: t.String(),
+                        name: t.String(),
+                        address: t.String(),
+                        price: t.Number(),
+                        isPPN: t.Boolean(),
+                        productId: t.Number(),
+                        factoryId: t.Number(),
+                    }),
                     detail: {
                         tags: ['Suppliers']
                     },
                 })
-            .put('/:id', async ({ db, body, params }) => {
+            .patch('/:id', async ({ db, body, params }) => {
+                const { code, name, factoryId, productId } = body
                 const supplier = await db.suppliers.update({
                     where: {
                         id: parseInt(params.id)
                     },
-                    data: body
+                    data: {
+                        code,
+                        name,
+                        factories: {
+                            connect: {
+                                id: factoryId
+                            }
+                        },
+                        products: {
+                            connect: {
+                                id: productId
+                            }
+                        }
+                    }
                 })
                 return supplier
             }
                 , {
 
-                    body: supplierODT.create,
+                    body: t.Object({
+                        code: t.String(),
+                        name: t.String(),
+                        factoryId: t.Number(),
+                        productId: t.Number(),
+                    }),
                     detail: {
                         tags: ['Suppliers']
                     },
@@ -131,6 +255,10 @@ export const suppliersRoutes = new Elysia()
                     },
                 });
 
+                if (!relatedFactory) {
+                    throw new Error('No related factory found for this supplier');
+                }
+
                 const latestFactoryPrice = await db.factoryPrices.findFirst({
                     where: {
                         factoryId: relatedFactory!.id,
@@ -140,32 +268,19 @@ export const suppliersRoutes = new Elysia()
                     },
                 });
 
-                if (latestFactoryPrice!.price > body.price) {
-                    throw new Error('Factory price is higher than supplier price');
+                if (latestFactoryPrice!.price < body.price) {
+                    throw new Error('Supplier price is higher than factory price');
                 }
 
-                const factory = await db.suppliers.update({
-                    where: {
-                        id: parseInt(id)
-                    },
+                const supplierPrice = await db.supplierPrices.create({
                     data: {
-                        prices: {
-                            create: [{
-                                price: body.price,
-                                isPPN: body.isPPN,
-                                factoryPriceId: latestFactoryPrice!.id,
-                            }]
-                        }
+                        ...body,
+                        factoryPriceId: latestFactoryPrice!.id,
+                        supplierId: parseInt(id),
                     },
-                    select: {
-                        id: true,
-                        code: true,
-                        name: true,
-                        prices: true,
-                    }
-                })
+                });
 
-                return factory
+                return supplierPrice
             }, {
                 body: t.Object({
                     price: t.Number(),
