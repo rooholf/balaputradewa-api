@@ -89,7 +89,8 @@ const app = new Elysia({
   )
   .use(cors())
   .listen({
-    port: 3000,
+    port: 8080,
+    hostname: '0.0.0.0'
   })
 
 // `server` will be null if listen isn't called

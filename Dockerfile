@@ -16,5 +16,5 @@ COPY . .
 RUN bunx prisma generate
 
 ENV NODE_ENV production
-ENV PORT 3000
+ENV PORT 8080
 ENTRYPOINT [ "bun", "run", "dev" ]
