@@ -15,6 +15,7 @@ RUN bun install
 COPY . .
 RUN bunx prisma generate
 
+ENV DB_URL mysql://db-bpd:SwsdKPsaDB4cZj6W@103.56.148.155:3306/db-bpd
 ENV NODE_ENV production
 ENV PORT 8080
 ENTRYPOINT [ "bun", "run", "dev" ]

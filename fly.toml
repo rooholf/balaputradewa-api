@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for balaputradewa-api on 2023-12-30T16:25:46+07:00
+# fly.toml app configuration file generated for api-balaputradewa on 2023-12-30T16:38:22+07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "balaputradewa-api"
+app = "api-balaputradewa"
 primary_region = "sin"
 
 [build]
