@@ -4,7 +4,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "bun run --watch dist/index.js",
-    "build": "bun i && bun x prisma generate && bun build ./src/index.ts --outdir ./dist"
+    "build": "bun build ./src/index.ts --outdir ./dist"
   },
   "dependencies": {
     "@elysiajs/bearer": "^0.7.0",
