@@ -27,14 +27,14 @@ export const ordersRoutes = new Elysia()
                                 {
                                     invCode: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
 
                                 {
                                     status: {
                                         contains: _status ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
 
@@ -124,13 +124,13 @@ export const ordersRoutes = new Elysia()
                                 {
                                     invCode: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                                 {
                                     status: {
                                         contains: _status ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
 
@@ -178,13 +178,13 @@ export const ordersRoutes = new Elysia()
                                 {
                                     invCode: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                                 {
                                     status: {
                                         contains: _status ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                             ]
@@ -236,13 +236,13 @@ export const ordersRoutes = new Elysia()
                                 {
                                     invCode: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                                 {
                                     status: {
                                         contains: _status ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                             ]

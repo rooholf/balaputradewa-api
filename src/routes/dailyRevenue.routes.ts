@@ -29,11 +29,11 @@ export const dailyRevenue = new Elysia()
                     if (!isNaN(invTotalNumber)) {
                         whereConditions.push({ invTotal: { equals: invTotalNumber } });
                     }
-                    whereConditions.push({ invCode: { contains: q, mode: Prisma.QueryMode.insensitive } });
+                    whereConditions.push({ invCode: { contains: q, } });
                 }
 
                 if (_status) {
-                    whereConditions.push({ status: { equals: _status, mode: Prisma.QueryMode.insensitive } });
+                    whereConditions.push({ status: { equals: _status, } });
                 }
 
                 if (lte || gte) {

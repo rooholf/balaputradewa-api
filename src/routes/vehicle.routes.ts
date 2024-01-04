@@ -28,7 +28,7 @@ export const vehiclesRoutes = new Elysia()
                                 {
                                     plate: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 },
                             ]

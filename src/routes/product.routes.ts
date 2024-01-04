@@ -25,13 +25,13 @@ export const productRoutes = new Elysia()
                             {
                                 code: {
                                     contains: q ?? '',
-                                    mode: 'insensitive'
+
                                 },
                             },
                             {
                                 name: {
                                     contains: q ?? '',
-                                    mode: 'insensitive'
+
                                 }
                             }
                         ]

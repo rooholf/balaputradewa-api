@@ -29,13 +29,13 @@ export const suppliersRoutes = new Elysia()
                                 {
                                     code: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     },
                                 },
                                 {
                                     name: {
                                         contains: q ?? '',
-                                        mode: 'insensitive'
+
                                     }
                                 }
                             ]
