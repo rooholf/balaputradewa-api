@@ -72,7 +72,6 @@ export const supplierInvoiceRoutes = new Elysia()
                                 select: {
                                     id: true,
                                     price: true,
-                                    isPPN: true,
                                     factoryPrice: {
                                         select: {
                                             id: true,
@@ -101,9 +100,7 @@ export const supplierInvoiceRoutes = new Elysia()
                 const invoicesWithProfits = invoices.map((invoice) => {
                     const noRef = invoice.factoryOrder!.noRef
                     const invRef = invoice.factoryOrder!.invCode
-                    const isPPN = invoice.supplierPrice!.isPPN
-                    const priceAfterPPN = isPPN ? invoice.supplierPrice!.price * 1.1 : invoice.supplierPrice!.price
-                    const profit = (invoice.supplierPrice!.factoryPrice!.price - priceAfterPPN) * invoice.qty
+                    const profit = (invoice.supplierPrice!.factoryPrice!.price) * invoice.qty
                     return {
                         ...invoice,
                         profit,
@@ -142,7 +139,6 @@ export const supplierInvoiceRoutes = new Elysia()
                             select: {
                                 id: true,
                                 price: true,
-                                isPPN: true,
                             }
                         },
                         vehicleOrders: {
@@ -193,6 +189,7 @@ export const supplierInvoiceRoutes = new Elysia()
 
                 const decodedInvCode = decodeURIComponent(params.invCode);
 
+
                 const supplierOrder = await db.supplierOrders.findUnique({
                     where: {
                         invCode: decodedInvCode
@@ -216,7 +213,6 @@ export const supplierInvoiceRoutes = new Elysia()
                             select: {
                                 id: true,
                                 price: true,
-                                isPPN: true,
                             }
                         },
                         vehicleOrders: {
@@ -251,6 +247,7 @@ export const supplierInvoiceRoutes = new Elysia()
                         qty: true,
                     }
                 });
+
 
                 if (supplierOrder!.status === 'Paid') {
                     set.status = 404;

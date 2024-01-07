@@ -74,14 +74,15 @@ export const factoryRoutes = new Elysia()
                     },
                 })
             .post('/', async ({ db, body }) => {
-                const { code, name, price } = body
+                const { code, name, price, isPPN } = body
                 const factory = await db.factories.create({
                     data: {
                         code,
                         name,
+                        isPPN,
                         prices: {
                             create: {
-                                price: body.price
+                                price,
                             }
                         }
                     }
@@ -93,6 +94,7 @@ export const factoryRoutes = new Elysia()
                         code: t.String(),
                         name: t.String(),
                         price: t.Number(),
+                        isPPN: t.Boolean()
                     }),
 
                     detail: {
@@ -110,7 +112,70 @@ export const factoryRoutes = new Elysia()
                         name: true,
                         suppliers: true,
                         prices: true,
-                        orders: true,
+                        orders: {
+                            select: {
+                                id: true,
+                                invCode: true,
+                                invTotal: true,
+                                invDate: true,
+                                noRef: true,
+                                factory: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        code: true,
+                                        isPPN: true,
+                                    }
+                                },
+                                factoryPrice: {
+                                    select: {
+                                        id: true,
+                                        price: true,
+
+                                    }
+                                },
+                                vehicleOrders: {
+                                    select: {
+                                        id: true,
+                                        qty: true,
+                                        vehicle: {
+                                            select: {
+                                                id: true,
+                                                plate: true,
+                                                color: true,
+                                            }
+                                        },
+                                        supplierOrder: {
+                                            select: {
+                                                supplier: {
+                                                    select: {
+                                                        products: true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                BankTransactions: {
+                                    select: {
+                                        id: true,
+                                        amount: true,
+                                        transactionCode: true,
+                                        transactionDate: true,
+                                        transactionType: true,
+                                        bankAccounts: {
+                                            select: {
+                                                id: true,
+                                                bankName: true,
+                                                accountName: true,
+                                                accountNumber: true,
+                                            }
+                                        }
+                                    }
+                                },
+                                qty: true,
+                            }
+                        },
                         bankAccounts: true,
                     }
                 })

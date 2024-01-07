@@ -223,9 +223,9 @@ export const bankAccount = new Elysia()
                 let newDescription = ""
 
                 if (description) {
-                    newDescription = type === 'Debit' ? description : "Penarikan " + description
+                    newDescription = type === 'Debit' ? description : "Transaksi untuk " + description
                 } else {
-                    newDescription = type === 'Debit' ? "Setoran " : "Penarikan "
+                    newDescription = type === 'Debit' ? "Setoran " : "Transaksi "
                 }
 
                 if (!isTransfer) {

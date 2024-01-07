@@ -111,22 +111,26 @@ export const factoryInvoicesRoutes = new Elysia()
                         invCode: true,
                         invTotal: true,
                         invDate: true,
+                        noRef: true,
                         factory: {
                             select: {
                                 id: true,
                                 name: true,
                                 code: true,
+                                isPPN: true,
                             }
                         },
                         factoryPrice: {
                             select: {
                                 id: true,
                                 price: true,
+
                             }
                         },
                         vehicleOrders: {
                             select: {
                                 id: true,
+                                qty: true,
                                 vehicle: {
                                     select: {
                                         id: true,
@@ -134,6 +138,32 @@ export const factoryInvoicesRoutes = new Elysia()
                                         color: true,
                                     }
                                 },
+                                supplierOrder: {
+                                    select: {
+                                        supplier: {
+                                            select: {
+                                                products: true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        BankTransactions: {
+                            select: {
+                                id: true,
+                                amount: true,
+                                transactionCode: true,
+                                transactionDate: true,
+                                transactionType: true,
+                                bankAccounts: {
+                                    select: {
+                                        id: true,
+                                        bankName: true,
+                                        accountName: true,
+                                        accountNumber: true,
+                                    }
+                                }
                             }
                         },
                         qty: true,
@@ -151,6 +181,7 @@ export const factoryInvoicesRoutes = new Elysia()
                 const { ...rest } = body as factoryOrder;
 
                 const decodedInvCode = decodeURIComponent(params.invCode);
+
 
                 const factoryOrder = await db.factoryOrders.findUnique({
                     where: {
@@ -171,44 +202,45 @@ export const factoryInvoicesRoutes = new Elysia()
                     }
                 });
 
+
+
+
                 if (factoryOrder!.status === 'Paid') {
                     set.status = 404;
                     throw new Error('Invoice already Paid');
                 }
 
-                const newBankTransaction = await db.bankTransactions.create({
+
+                const updateFactoryOrderStatusPromise = db.factoryOrders.update({
+                    where: { invCode: decodedInvCode },
+                    data: { status: 'Paid' }
+                });
+
+                const updateBankAccountBalancePromise = db.bankAccounts.update({
+                    where: { id: rest!.bankAccountId },
+                    data: { balance: { increment: factoryOrder!.invTotal } }
+                });
+
+                const newBankTransactionPromise = db.bankTransactions.create({
                     data: {
                         bankAccountId: rest!.bankAccountId,
                         amount: factoryOrder!.invTotal,
-                        transactionCode: "TRS/" + factoryOrder!.invCode + "/" + Math.floor(Math.random() * 1000),
+                        transactionCode: `TRS/${factoryOrder!.invCode}/${Math.floor(Math.random() * 1000)}`,
                         transactionDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
-                        transactionType: 'Credit',
-                        description: 'Pembayaran Dari Pabrik ' + factoryOrder!.factory!.name + ' Untuk Invoice ' + factoryOrder!.invCode,
+                        transactionType: 'Debit',
+                        description: 'Pembayaran Dari Pabrik ' + factoryOrder?.factory?.name + ' Untuk Invoice ' + decodedInvCode,
                         factoryInvCode: factoryOrder!.invCode,
                     }
-                })
+                });
 
-                const updateFactoryOrderStatus = await db.factoryOrders.update({
-                    where: {
-                        invCode: decodedInvCode
-                    },
-                    data: {
-                        status: 'Paid'
-                    }
-                })
+                const [newBankTransaction, updateFactoryOrderStatus, updateBankAccountBalance] = await Promise.all([
+                    newBankTransactionPromise,
+                    updateFactoryOrderStatusPromise,
+                    updateBankAccountBalancePromise
+                ]);
 
-                const updateBankAccountBalance = await db.bankAccounts.update({
-                    where: {
-                        id: rest!.bankAccountId,
-                    },
-                    data: {
-                        balance: {
-                            increment: factoryOrder!.invTotal
-                        }
-                    }
-                })
 
-                return newBankTransaction
+                return [newBankTransaction, updateFactoryOrderStatus, updateBankAccountBalance]
 
             }, {
                 detail: {
@@ -250,9 +282,13 @@ export const factoryInvoicesRoutes = new Elysia()
 
                 const [factoryPrice, factory] = await Promise.all([factoryPricePromise, factoryPromise]);
 
-                const factoryInvoiceCode = `INV-${factory!.code}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+                const factoryInvoiceCode = `INV-${factory!.code}-${rest!.noRef}-${invoiceCode}`;
 
                 const vehicleOrderQty = rest!.vehicleOrders.reduce((acc, cur) => acc + cur.qty, 0);
+
+                const pph = factoryPrice!.price * 0.025
+
+                const ppn = factory!.isPPN ? factoryPrice!.price * 0.11 : 0
 
                 const createOrUpdateFactoryOrderPromise = db.factoryOrders.upsert({
                     where: { invCode: factoryInvoiceCode },
@@ -260,7 +296,10 @@ export const factoryInvoicesRoutes = new Elysia()
                         invCode: factoryInvoiceCode,
                         invDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
                         noRef: rest!.noRef,
-                        invTotal: factoryPrice!.price * vehicleOrderQty,
+                        dpp: factoryPrice!.price * vehicleOrderQty,
+                        ppn,
+                        pph,
+                        invTotal: (factoryPrice!.price + ppn + pph) * vehicleOrderQty,
                         factoryId: factory!.id,
                         factoryPriceId: factoryPrice!.id,
                         qty: vehicleOrderQty,
@@ -270,19 +309,6 @@ export const factoryInvoicesRoutes = new Elysia()
                 });
 
                 const [createOrUpdateFactoryOrder] = await Promise.all([createOrUpdateFactoryOrderPromise]);
-                const newBankTransactionPromise = db.bankTransactions.create({
-                    data: {
-                        bankAccountId: rest!.bankAccountId,
-                        amount: createOrUpdateFactoryOrder.invTotal,
-                        transactionCode: `TRS/${createOrUpdateFactoryOrder.invCode}/${Math.floor(Math.random() * 1000)}`,
-                        transactionDate: rest.transactionDate ? new Date(rest.transactionDate) : new Date(),
-                        transactionType: 'Debit',
-                        description: 'Pembayaran Dari Pabrik ' + factory?.name + ' Untuk Invoice ' + factoryInvoiceCode,
-                        factoryInvCode: createOrUpdateFactoryOrder.invCode,
-                    }
-                });
-
-
 
 
 
@@ -324,15 +350,10 @@ export const factoryInvoicesRoutes = new Elysia()
                     const [supplier, supplierPrice] = await Promise.all([supplierPromise, supplierPricePromise]);
 
                     // Generate the supplierInvoiceCode
-                    const supplierInvoiceCode = `INV-${supplier!.code}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+                    const supplierInvoiceCode = `INV-${supplier!.code}-${rest!.noRef}-${invoiceCode}`;
 
                     // Calculate the supplierOrderQty
                     const supplierOrderQty = vehicleOrders.reduce((acc, cur) => acc + cur.qty, 0);
-
-                    // Check if supplierPrice is null or supplierPrice.isPPN is null
-                    if (!supplierPrice || supplierPrice.isPPN === null) {
-                        throw new Error('Supplier price is null or isPPN is null');
-                    }
 
                     // Create or update the supplierOrder
                     const createOrUpdateSupplierOrderPromise = db.supplierOrders.upsert({
@@ -340,7 +361,7 @@ export const factoryInvoicesRoutes = new Elysia()
                         create: {
                             invCode: supplierInvoiceCode,
                             invDate: new Date(),
-                            invTotal: !supplierPrice.isPPN ? (supplierPrice.price * supplierOrderQty) : (supplierPrice.price * supplierOrderQty * 1.11),
+                            invTotal: supplierPrice!.price * supplierOrderQty,
                             supplierId: supplier!.id,
                             supplierPriceId: supplierPrice!.id,
                             factoryPriceId: factoryPrice!.id,
@@ -355,7 +376,7 @@ export const factoryInvoicesRoutes = new Elysia()
 
                     // Create the vehicleOrders
                     const createVehicleOrderPromises = vehicleOrders.map(async (vehicleOrder) => {
-                        const vehicleInvCode = `INV-VOR-${vehicleOrder.vehicleId}-${invoiceCode}-${Math.random().toString(36).substring(2, 15)}`;
+                        const vehicleInvCode = `VOR-${rest!.noRef}-${vehicleOrder.vehicleId}-${invoiceCode}`;
 
                         // Fetch the vehicle from the database
                         const vehicle = await db.vehicles.findUnique({ where: { id: vehicleOrder.vehicleId } });
@@ -380,23 +401,6 @@ export const factoryInvoicesRoutes = new Elysia()
 
                 const resolvedSupplierOrders = await Promise.all(createSupplierOrders);
 
-
-
-                const updateFactoryOrderStatusPromise = db.factoryOrders.update({
-                    where: { invCode: createOrUpdateFactoryOrder.invCode },
-                    data: { status: 'Paid' }
-                });
-
-                const updateBankAccountBalancePromise = db.bankAccounts.update({
-                    where: { id: rest!.bankAccountId },
-                    data: { balance: { increment: createOrUpdateFactoryOrder.invTotal } }
-                });
-
-                const [newBankTransaction, updateFactoryOrderStatus, updateBankAccountBalance] = await Promise.all([
-                    newBankTransactionPromise,
-                    updateFactoryOrderStatusPromise,
-                    updateBankAccountBalancePromise
-                ]);
 
                 const formattedData = resolvedSupplierOrders.map(({ createOrUpdateSupplierOrder, resolvedVehicleOrders }) => {
                     return {
@@ -432,7 +436,6 @@ export const factoryInvoicesRoutes = new Elysia()
                     ),
                     noRef: t.String(),
                     transactionDate: t.String(),
-                    bankAccountId: t.Number(),
                 }),
             })
     })

@@ -48,7 +48,6 @@ export const vehiclesRoutes = new Elysia()
                                         select: {
                                             id: true,
                                             price: true,
-                                            isPPN: true,
                                             created_at: true,
                                         },
                                         orderBy: {
@@ -93,7 +92,6 @@ export const vehiclesRoutes = new Elysia()
                                     select: {
                                         id: true,
                                         price: true,
-                                        isPPN: true,
                                         created_at: true,
                                     },
                                     orderBy: {

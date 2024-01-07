@@ -55,10 +55,8 @@ export const suppliersRoutes = new Elysia()
 
                 const data = suppliers.map((supplier) => {
                     const lastCreatedPrice = supplier.prices.slice(-1)[0];
-                    const isPPN = lastCreatedPrice?.isPPN ?? false;
                     return {
                         ...supplier,
-                        isPPN,
                         lastCreatedPrice,
                     };
                 });
@@ -81,12 +79,27 @@ export const suppliersRoutes = new Elysia()
                         id: true,
                         code: true,
                         name: true,
-                        supplierOrders: true,
+                        supplierOrders: {
+                            select: {
+                                supplierPrice: {
+                                    select: {
+                                        factoryPrice: {
+                                            select: {
+                                                price: true
+                                            }
+                                        }
+                                    }
+                                },
+                                qty: true
+                            }
+                        },
                         prices: true,
                         vehicles: true,
                         created_at: true,
                     }
                 })
+
+
                 return supplier
             }
                 , {
@@ -134,7 +147,7 @@ export const suppliersRoutes = new Elysia()
                 })
 
             .post('/', async ({ db, body }) => {
-                const { code, name, factoryId, address, price, isPPN, productId } = body
+                const { code, name, factoryId, address, price, productId } = body
 
                 const latestFactoryPrice = await db.factoryPrices.findFirst({
                     where: {
@@ -156,7 +169,6 @@ export const suppliersRoutes = new Elysia()
                         prices: {
                             create: {
                                 price,
-                                isPPN,
                                 factoryPrice: {
                                     connect: {
                                         id: latestFactoryPrice!.id,
@@ -187,7 +199,6 @@ export const suppliersRoutes = new Elysia()
                         name: t.String(),
                         address: t.String(),
                         price: t.Number(),
-                        isPPN: t.Boolean(),
                         productId: t.Number(),
                         factoryId: t.Number(),
                     }),

@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgres"
-  url      = env("DATABASE_URL")
+  provider = "mysql"
+  url      = env("DB_URL")
 }
 
 model Users {
@@ -109,7 +109,6 @@ model SupplierOrders {
 model SupplierPrices {
   id             Int           @id @default(autoincrement())
   price          Int
-  isPPN          Boolean
   supplier       Suppliers     @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   supplierId     Int
   factoryPrice   FactoryPrices @relation(fields: [factoryPriceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -126,6 +125,7 @@ model Factories {
   id           Int             @id @unique @default(autoincrement())
   code         String          @unique
   name         String
+  isPPN        Boolean
   prices       FactoryPrices[]
   suppliers    Suppliers[]
   orders       FactoryOrders[]
@@ -144,6 +144,9 @@ model FactoryOrders {
   invTotal       Int
   qty            Int
   factoryId      Int
+  dpp            Int
+  ppn            Int
+  pph            Int
   noRef          String
   factory        Factories       @relation(fields: [factoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   factoryPriceId Int?

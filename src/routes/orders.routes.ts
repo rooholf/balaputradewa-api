@@ -60,7 +60,6 @@ export const ordersRoutes = new Elysia()
                                         select: {
                                             id: true,
                                             price: true,
-                                            isPPN: true,
                                             factoryPrice: {
                                                 select: {
                                                     id: true,
@@ -84,7 +83,6 @@ export const ordersRoutes = new Elysia()
                                 select: {
                                     id: true,
                                     price: true,
-                                    isPPN: true,
                                     factoryPrice: {
                                         select: {
                                             id: true,
@@ -145,23 +143,63 @@ export const ordersRoutes = new Elysia()
                             invCode: true,
                             invTotal: true,
                             invDate: true,
+                            noRef: true,
                             status: true,
-                            qty: true,
                             factory: {
                                 select: {
                                     id: true,
                                     name: true,
                                     code: true,
+                                    isPPN: true,
                                 }
                             },
                             factoryPrice: {
                                 select: {
                                     id: true,
                                     price: true,
+
                                 }
                             },
-                            vehicleOrders: true,
-                            created_at: true,
+                            vehicleOrders: {
+                                select: {
+                                    id: true,
+                                    qty: true,
+                                    vehicle: {
+                                        select: {
+                                            id: true,
+                                            plate: true,
+                                            color: true,
+                                        }
+                                    },
+                                    supplierOrder: {
+                                        select: {
+                                            supplier: {
+                                                select: {
+                                                    products: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            BankTransactions: {
+                                select: {
+                                    id: true,
+                                    amount: true,
+                                    transactionCode: true,
+                                    transactionDate: true,
+                                    transactionType: true,
+                                    bankAccounts: {
+                                        select: {
+                                            id: true,
+                                            bankName: true,
+                                            accountName: true,
+                                            accountNumber: true,
+                                        }
+                                    }
+                                }
+                            },
+                            qty: true,
                         }
                     });
                     orders.push(...factoryOrders);
@@ -205,7 +243,6 @@ export const ordersRoutes = new Elysia()
                                         select: {
                                             id: true,
                                             price: true,
-                                            isPPN: true,
                                             factoryPrice: {
                                                 select: {
                                                     id: true,
@@ -255,27 +292,82 @@ export const ordersRoutes = new Elysia()
                             invCode: true,
                             invTotal: true,
                             invDate: true,
+                            noRef: true,
                             status: true,
-                            qty: true,
                             factory: {
                                 select: {
                                     id: true,
                                     name: true,
                                     code: true,
+                                    isPPN: true,
                                 }
                             },
                             factoryPrice: {
                                 select: {
                                     id: true,
                                     price: true,
+
                                 }
                             },
-                            vehicleOrders: true,
-                            created_at: true,
+                            vehicleOrders: {
+                                select: {
+                                    id: true,
+                                    qty: true,
+                                    plate: true,
+                                    vehicle: {
+                                        select: {
+                                            id: true,
+                                            plate: true,
+                                            color: true,
+                                        }
+                                    },
+                                    supplierOrder: {
+                                        select: {
+                                            supplier: {
+                                                select: {
+                                                    products: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            BankTransactions: {
+                                select: {
+                                    id: true,
+                                    amount: true,
+                                    transactionCode: true,
+                                    transactionDate: true,
+                                    transactionType: true,
+                                    bankAccounts: {
+                                        select: {
+                                            id: true,
+                                            bankName: true,
+                                            accountName: true,
+                                            accountNumber: true,
+                                        }
+                                    }
+                                }
+                            },
+                            qty: true,
                         }
                     });
 
-                    orders.push(...supplierOrders, ...factoryOrders);
+                    const ownedBySupplier = supplierOrders.map((item) => {
+                        return {
+                            ...item,
+                            ownedBy: "Supplier"
+                        }
+                    })
+
+                    const ownedByFactory = factoryOrders.map((item) => {
+                        return {
+                            ...item,
+                            ownedBy: "Factory"
+                        }
+                    })
+
+                    orders.push(...ownedByFactory, ...ownedBySupplier);
                 }
 
                 return orders;
