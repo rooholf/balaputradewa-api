@@ -9,7 +9,7 @@ export const factoryRoutes = new Elysia()
     .group('/factories', (app) => {
         return app
             .use(ctx)
-            .get('/', async ({ db, query }) => {
+            .get('/', async ({ db, query, set }) => {
                 const { _page, _end, _sort, _order, q } = query;
                 const limit = +(_end ?? 10);
                 const offset = (+(_page ?? 1) - 1) * limit;
@@ -17,6 +17,9 @@ export const factoryRoutes = new Elysia()
                 const order = _order ?? 'asc';
 
                 const orderBy = { [sort]: order };
+
+                const count = await db.factories.count()
+
                 const factories = await db.factories.findMany(
                     {
                         orderBy,
@@ -66,6 +69,10 @@ export const factoryRoutes = new Elysia()
 
                     }
                 )
+
+                if (factories) {
+                    set.headers['x-total-count'] = `${count}`
+                }
                 return factories
             },
                 {

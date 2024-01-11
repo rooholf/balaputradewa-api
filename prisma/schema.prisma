@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgres"
-  url      = env("DATABASE_URL")
+  provider = "mysql"
+  url      = env("DB_URL")
 }
 
 model Users {

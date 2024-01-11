@@ -39,20 +39,13 @@ try {
   const productKayu1 = await prisma.products.create({
     data: {
       name: 'Kayu',
-      code: 'KCIC',
+      code: 'KARET',
     },
   });
   const productKayu2 = await prisma.products.create({
     data: {
       name: 'Kayu',
-      code: 'KRRC',
-    },
-  });
-
-  const productKaret = await prisma.products.create({
-    data: {
-      name: 'Karet',
-      code: 'KARC',
+      code: 'KKRC',
     },
   });
 
