@@ -10,14 +10,20 @@ export const farmersRoutes = new Elysia()
     .group('/farmers', (app) => {
         return app
             .use(ctx)
-            .get('/', async ({ db, query }) => {
+            .get('/', async ({ db, query, set }) => {
                 const { _page, _end, _sort, _order, q } = query;
-                const limit = +(_end ?? 10);
+
+                const count = await db.farmers.count()
+
+                const limit = +(_end ?? count);
                 const offset = (+(_page ?? 1) - 1) * limit;
                 const sort = (_sort ?? 'id').toString();
                 const order = _order ?? 'asc';
 
                 const orderBy = { [sort]: order };
+
+
+
                 const farmers = await db.farmers.findMany(
                     {
                         orderBy,
@@ -57,10 +63,14 @@ export const farmersRoutes = new Elysia()
                         }
                     }
                 )
+
+                if (farmers) {
+                    set.headers['x-total-count'] = `${count}`
+                }
+
                 return farmers
             },
                 {
-
                     detail: {
                         tags: ['Farmers']
                     },

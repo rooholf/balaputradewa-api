@@ -89,7 +89,7 @@ const app = new Elysia({
   )
   .use(cors())
   .listen({
-    port: 8080,
+    port: 3000,
     hostname: '0.0.0.0'
   })
 
