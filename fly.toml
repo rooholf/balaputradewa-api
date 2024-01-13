@@ -22,4 +22,4 @@ primary_region = "sin"
   memory_mb = 2048
 
 [env]
- DB_URL=mysql://db-bpd:SwsdKPsaDB4cZj6W@103.56.148.155:3306/db-bpd
+ DB_URL="mysql://db-bpd:SwsdKPsaDB4cZj6W@103.56.148.155:3306/db-bpd"
