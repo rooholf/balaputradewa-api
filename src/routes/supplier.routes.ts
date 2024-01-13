@@ -284,10 +284,12 @@ export const suppliersRoutes = new Elysia()
                 }
 
                 const supplierPrice = await db.supplierPrices.create({
+
                     data: {
-                        ...body,
+                        price: body.price,
                         factoryPriceId: latestFactoryPrice!.id,
                         supplierId: parseInt(id),
+
                     },
                 });
 
